@@ -1,0 +1,102 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Build and packaging output
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.secret
+*.key
+*.pem
+.agents
+.codex
+
+# IDE and editor state
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Notebook and interactive artifacts
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Data, model artifacts, and experiment output
+data/
+datasets/
+artifacts/
+outputs/
+runs/
+mlruns/
+models/
+checkpoints/
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+*.cbm
+*.bst
+*.model
+
+# Large tabular/intermediate files
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.arrow
+*.orc
+*.jsonl
+
+# Logs and profiling
+logs/
+*.log
+*.out
+*.err
+profile/
+profiler/
+
+# CUDA/RAPIDS scratch output
+cuda_cache/
+cuml_cache/
+dask-worker-space/
+ucx_log*
+
+# Local temp files
+tmp/
+temp/
+.cache/
