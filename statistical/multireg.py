@@ -1,6 +1,6 @@
 from sklearn.linear_model import ElasticNet
 from skopt.space import Integer, Real, Categorical
-from .base_model import BaseModel
+from ..base_model import BaseModel
 import copy
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline

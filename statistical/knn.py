@@ -1,5 +1,5 @@
 
-from .base_model import BaseModel
+from ..base_model import BaseModel
 from skopt.space import Integer, Categorical
 from sklearn.inspection import permutation_importance
 

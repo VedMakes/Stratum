@@ -3,7 +3,7 @@ from sklearn.inspection import permutation_importance
 from sklearn.utils import resample
 from skopt.space import Categorical, Real
 
-from .base_model import BaseModel
+from ..base_model import BaseModel
 
 
 class SVMModel(BaseModel):

@@ -1,4 +1,4 @@
-from .base_model import BaseModel
+from ..base_model import BaseModel
 from lightgbm import LGBMRegressor, LGBMClassifier
 from skopt.space import Integer, Real, Categorical
 import lightgbm as lgb

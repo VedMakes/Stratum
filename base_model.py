@@ -1,6 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
-from inspect import signature
+from inspect import Parameter, signature
 from typing import Any, Callable, Optional
 import copy
 import warnings
@@ -555,8 +555,8 @@ class BaseModel(ABC):
             return
 
         positional = {
-            param.POSITIONAL_ONLY,
-            param.POSITIONAL_OR_KEYWORD,
+            Parameter.POSITIONAL_ONLY,
+            Parameter.POSITIONAL_OR_KEYWORD,
         }
         accepts_varargs = any(param.kind == param.VAR_POSITIONAL for param in params.values())
         positional_count = sum(param.kind in positional for param in params.values())

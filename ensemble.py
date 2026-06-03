@@ -441,14 +441,9 @@ class Ensemble:
             params = signature(self.scorer).parameters
         except (TypeError, ValueError):
             return False
-        positional = {
-            param.POSITIONAL_ONLY,
-            param.POSITIONAL_OR_KEYWORD,
-        }
         return (
             parameter_name in params
             or any(param.kind == param.VAR_KEYWORD for param in params.values())
-            or sum(param.kind in positional for param in params.values()) >= 3
         )
 
     def _call_scorer_with_proba(self, y_true, y_pred, y_proba):

@@ -1,4 +1,4 @@
-from .base_model import BaseModel
+from ..base_model import BaseModel
 from xgboost import XGBRegressor, XGBClassifier
 from skopt.space import Integer, Real
 import xgboost as xgb

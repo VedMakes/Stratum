@@ -1,4 +1,4 @@
-from .base_model import BaseModel
+from ..base_model import BaseModel
 from catboost import CatBoostClassifier, CatBoostRegressor
 from skopt.space import Integer, Real, Categorical
 import catboost as cb
@@ -9,9 +9,19 @@ class CatBoostModel(BaseModel):
         super().__init__(mode = mode, crossval = crossval, needs_scaling = False, use_smote= use_smote, supports_cuda = supports_cuda, verbose=verbose)
         
         if mode == "Regressor":
-            self._model = CatBoostRegressor(random_state=42, task_type='GPU' if self._enable_CUDA else 'CPU', verbose=False)
+            self._model = CatBoostRegressor(
+                random_state=42,
+                task_type='GPU' if self._enable_CUDA else 'CPU',
+                verbose=False,
+                allow_writing_files=False,
+            )
         elif mode == "Classifier":
-            self._model = CatBoostClassifier(random_state=42, task_type='GPU' if self._enable_CUDA else 'CPU', verbose=False)
+            self._model = CatBoostClassifier(
+                random_state=42,
+                task_type='GPU' if self._enable_CUDA else 'CPU',
+                verbose=False,
+                allow_writing_files=False,
+            )
         else:
             raise ValueError(f"Unsupported mode: {mode}")
         

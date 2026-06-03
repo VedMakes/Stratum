@@ -36,7 +36,7 @@ class ModelSpec:
 MODEL_SPECS = {
     "random_forest": ModelSpec(
         name="random_forest",
-        module=".RandomForest",
+        module=".statistical.random_forest",
         class_name="RandomForestModel",
         tasks=("classification", "regression"),
         aliases=("rf", "forest"),
@@ -44,7 +44,7 @@ MODEL_SPECS = {
     ),
     "xgboost": ModelSpec(
         name="xgboost",
-        module=".XGBoost",
+        module=".statistical.xgboost_model",
         class_name="XGBoostModel",
         tasks=("classification", "regression"),
         aliases=("xgb",),
@@ -52,7 +52,7 @@ MODEL_SPECS = {
     ),
     "lightgbm": ModelSpec(
         name="lightgbm",
-        module=".LightGBM",
+        module=".statistical.lightgbm_model",
         class_name="LightGBMModel",
         tasks=("classification", "regression"),
         aliases=("lgbm", "lgb"),
@@ -60,7 +60,7 @@ MODEL_SPECS = {
     ),
     "catboost": ModelSpec(
         name="catboost",
-        module=".CatBoost",
+        module=".statistical.catboost_model",
         class_name="CatBoostModel",
         tasks=("classification", "regression"),
         aliases=("cat",),
@@ -68,7 +68,7 @@ MODEL_SPECS = {
     ),
     "svm": ModelSpec(
         name="svm",
-        module=".SVM",
+        module=".statistical.svm",
         class_name="SVMModel",
         tasks=("classification", "regression"),
         aliases=("svc", "svr"),
@@ -76,7 +76,7 @@ MODEL_SPECS = {
     ),
     "knn": ModelSpec(
         name="knn",
-        module=".KNN",
+        module=".statistical.knn",
         class_name="KNNModel",
         tasks=("classification", "regression"),
         aliases=("nearest_neighbors", "k_neighbors"),
@@ -84,7 +84,7 @@ MODEL_SPECS = {
     ),
     "logistic_regression": ModelSpec(
         name="logistic_regression",
-        module=".LogReg",
+        module=".statistical.logreg",
         class_name="LogRegModel",
         tasks=("classification",),
         aliases=("logreg", "logistic", "lr"),
@@ -92,7 +92,7 @@ MODEL_SPECS = {
     ),
     "polynomial_regression": ModelSpec(
         name="polynomial_regression",
-        module=".MultiReg",
+        module=".statistical.multireg",
         class_name="MultiRegModel",
         tasks=("regression",),
         aliases=("multireg", "multi_reg", "elastic_poly"),

@@ -1,4 +1,4 @@
-from .base_model import BaseModel
+from ..base_model import BaseModel
 from skopt.space import Integer, Categorical
 import copy
 import warnings

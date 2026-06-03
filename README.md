@@ -4,6 +4,18 @@ MLProj is a small tabular machine-learning wrapper library. It gives the common 
 
 The project is intentionally lightweight: use the high-level `train()` facade for quick workflows, or instantiate wrappers directly when you need model-specific control.
 
+## Package Layout
+
+Core API files stay at the package root:
+
+- `api.py`: high-level `train()` facade
+- `base_model.py`: shared wrapper lifecycle, scoring, CUDA routing
+- `registry.py`: model names, aliases, and task support
+- `result.py`: returned training result object
+- `ensemble.py`: ensemble search and voting
+
+Statistical/tabular wrappers live under `statistical/`. Neural-network placeholders live under `Neural/`.
+
 ## Supported Models
 
 Classification and regression:
@@ -277,7 +289,7 @@ print(model_info("regression"))
 Run a syntax check:
 
 ```bash
-python -m py_compile *.py
+python -m py_compile *.py statistical/*.py
 ```
 
 The neural-network files under `Neural/` are placeholders for now.

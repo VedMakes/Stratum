@@ -1,5 +1,5 @@
 from skopt.space import Real, Integer, Categorical
-from .base_model import BaseModel
+from ..base_model import BaseModel
 import copy 
 
 
