@@ -126,7 +126,7 @@ class DummyEncoder(BaseEstimator, TransformerMixin):
         if not hasattr(X, "select_dtypes"):
             return np.asarray(X, dtype="float32")
 
-        cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+        cat_cols = X.select_dtypes(include=["object", "category", "string"]).columns.tolist()
         if self.is_cudf:
             import cudf
 
@@ -138,6 +138,73 @@ class DummyEncoder(BaseEstimator, TransformerMixin):
         import pandas as pd
 
         return pd.get_dummies(X, drop_first=self.drop_first).astype("float32")
+
+
+class DataFrameImputer(BaseEstimator, TransformerMixin):
+    """Median/mode imputation that preserves pandas columns and dtypes."""
+
+    def __init__(self, categorical_as_category=False):
+        self.categorical_as_category = categorical_as_category
+        self.fill_values_ = None
+        self.numeric_columns_ = None
+        self.categorical_columns_ = None
+        self.categories_ = None
+
+    def fit(self, X, y=None):
+        if not hasattr(X, "columns"):
+            self.fill_values_ = None
+            return self
+
+        self.numeric_columns_ = X.select_dtypes(include=[np.number]).columns.tolist()
+        self.categorical_columns_ = [col for col in X.columns if col not in self.numeric_columns_]
+        self.fill_values_ = {}
+        self.categories_ = {}
+        for col in self.numeric_columns_:
+            clean = X[col].dropna()
+            self.fill_values_[col] = float(clean.median()) if len(clean) else 0.0
+        for col in self.categorical_columns_:
+            clean = X[col].dropna()
+            self.fill_values_[col] = clean.mode().iloc[0] if len(clean) else "__missing__"
+            if self.categorical_as_category:
+                values = clean.astype(str).drop_duplicates().tolist()
+                fill = str(self.fill_values_[col])
+                self.categories_[col] = values if fill in values else [*values, fill]
+        return self
+
+    def transform(self, X):
+        if self.fill_values_ is None:
+            array = np.asarray(X)
+            if not np.issubdtype(array.dtype, np.number):
+                return array
+            result = array.astype(float, copy=True)
+            medians = np.nanmedian(result, axis=0)
+            medians = np.where(np.isnan(medians), 0.0, medians)
+            rows, cols = np.where(np.isnan(result))
+            result[rows, cols] = medians[cols]
+            return result
+
+        result = X.copy()
+        for col in self.numeric_columns_:
+            result[col] = result[col].fillna(self.fill_values_[col])
+        for col in self.categorical_columns_:
+            fill = self.fill_values_[col]
+            if self.categorical_as_category:
+                import pandas as pd
+
+                values = result[col].astype("string").fillna(str(fill))
+                result[col] = pd.Categorical(values, categories=self.categories_[col])
+            else:
+                if str(result[col].dtype) == "category" and fill not in result[col].cat.categories:
+                    result[col] = result[col].cat.add_categories([fill])
+                result[col] = result[col].fillna(fill)
+        return result
+
+    def get_feature_names_out(self, input_features=None):
+        if input_features is not None:
+            return np.asarray(input_features, dtype=object)
+        if self.fill_values_ is not None:
+            return np.asarray(list(self.fill_values_), dtype=object)
+        raise RuntimeError("Input feature names are unavailable.")
 
 
 class CudaPipeline(BaseEstimator):
@@ -414,6 +481,14 @@ class BaseModel(ABC):
             raise RuntimeError("No model is available.")
         return model.named_steps["model"] if hasattr(model, "named_steps") and "model" in model.named_steps else model
 
+    def transform_features(self, X, model=None):
+        model = model or self._best_model
+        if model is None:
+            raise RuntimeError("No model is available.")
+        if hasattr(model, "steps") and len(model.steps) > 1:
+            return model[:-1].transform(X)
+        return X
+
     def feature_names(self, X=None, model=None):
         X = self.train_X if X is None else X
         model = model or self._best_model
@@ -663,14 +738,17 @@ class BaseModel(ABC):
         if use_cuda:
             return CudaPipeline(model, self._cuda_scaler() if self._standardize else None)
 
-        steps = []
+        steps = [(
+            "imputer",
+            DataFrameImputer(categorical_as_category=self._model_supports_categoricals()),
+        )]
         if not self._model_supports_categoricals():
             steps.append(("encoder", DummyEncoder()))
         if self._standardize:
             steps.append(("scaler", StandardScaler()))
         steps.append(("model", model))
 
-        return Pipeline(steps) if len(steps) > 1 else model
+        return Pipeline(steps)
 
     def _cross_val_score(self, params):
         return self._cpu_cross_val_score(self.train_X, self.train_y, params, self.cv)
@@ -826,7 +904,7 @@ class BaseModel(ABC):
 
     def _model_supports_categoricals(self):
         model_name = self._model.__class__.__name__.lower()
-        return any(name in model_name for name in ("catboost", "xgb", "lgbm", "lightgbm"))
+        return any(name in model_name for name in ("xgb", "lgbm", "lightgbm"))
 
     def _port_data_to_cuda(self, X, y, fit=False):
         return self._port_X_to_cuda(X, fit=fit), self._port_y_to_cuda(y, fit=fit)

@@ -56,13 +56,15 @@ class XGBoostModel(BaseModel):
             raise RuntimeError("model does not support prediction. Ensure it is fitted before SHAP explanation.")
 
         X, y = self.train_X, self.train_y
+        estimator = self.final_estimator()
+        transformed_X = self.transform_features(X)
         
-        explainer = shap.TreeExplainer(self._best_model)
-        shap_values = explainer.shap_values(self.train_X, check_additivity=False)
-        
-        shap.summary_plot(shap_values, self.train_X)
-        shap.dependence_plot(0, shap_values, X)
-        
+        explainer = shap.TreeExplainer(estimator)
+        shap_values = explainer.shap_values(transformed_X, check_additivity=False)
+
+        shap.summary_plot(shap_values, transformed_X)
+        shap.dependence_plot(0, shap_values, transformed_X)
+
         print("SHAP values calculated for the best model.")
         return shap_values
 

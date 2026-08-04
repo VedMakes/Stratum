@@ -10,6 +10,10 @@ __pycache__/
 .coverage.*
 htmlcov/
 coverage.xml
+.tox/
+.nox/
+junit*.xml
+test-results/
 
 # Build and packaging output
 build/

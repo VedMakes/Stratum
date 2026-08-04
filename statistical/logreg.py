@@ -16,7 +16,7 @@ class LogRegModel(BaseModel):
                 self._model = LogisticRegression()
             else:
                 from sklearn.linear_model import LogisticRegression
-                self._model = LogisticRegression(random_state=42, solver='lbfgs', n_jobs=self.n_jobs)
+                self._model = LogisticRegression(random_state=42, solver='lbfgs')
         else:
             raise ValueError(f"Unsupported mode: {mode}")
         

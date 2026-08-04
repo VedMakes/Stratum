@@ -1,60 +1,174 @@
-# MLProj
+# Stratum
 
-MLProj is a small tabular machine-learning wrapper library. It gives the common model families a consistent interface for fitting, tuning, scoring, explaining, CUDA opt-in, and simple ensemble search.
+Local-first tabular ML for AI agents.
 
-The project is intentionally lightweight: use the high-level `train()` facade for quick workflows, or instantiate wrappers directly when you need model-specific control.
+Stratum is the main product here: an MCP server that lets an agent inspect CSVs,
+audit modelling risks, split data, train models, validate them, score new rows,
+track user decisions, and produce reports without handing raw data to a remote
+service.
 
-## Package Layout
+It ships with **MLProj**, a small modular statistical modelling library. Stratum
+uses MLProj under the hood for model wrappers, tuning, scoring, feature
+importance, and fitted artifacts; you can also use MLProj directly from Python.
 
-Core API files stay at the package root:
+## What You Get
 
-- `api.py`: high-level `train()` facade
-- `base_model.py`: shared wrapper lifecycle, scoring, CUDA routing
-- `registry.py`: model names, aliases, and task support
-- `result.py`: returned training result object
-- `ensemble.py`: ensemble search and voting
+- Agent-facing MCP tools for profiling, drift, leakage, label quality, splitting,
+  training, validation, prediction, export, and reporting.
+- A two-way decision layer so the agent can pause for domain judgement, record the
+  answer, and continue with session context intact.
+- Local persistence for sessions, runs, decisions, journals, models, and data
+  contracts.
+- Provider-neutral optional LLM support for semantic feature engineering and
+  explanation; everything else runs locally.
+- Direct Python access to the underlying MLProj modelling API.
 
-Statistical/tabular wrappers live under `statistical/`. Neural-network placeholders live under `Neural/`.
+## Install
 
-## Supported Models
-
-Classification and regression:
-
-- `random_forest` aliases: `rf`, `forest`
-- `xgboost` aliases: `xgb`
-- `lightgbm` aliases: `lgbm`, `lgb`
-- `catboost` aliases: `cat`
-- `svm` aliases: `svc`, `svr`
-- `knn` aliases: `nearest_neighbors`, `k_neighbors`
-
-Classification only:
-
-- `logistic_regression` aliases: `logreg`, `logistic`, `lr`
-
-Regression only:
-
-- `polynomial_regression` aliases: `multireg`, `multi_reg`, `elastic_poly`
-
-## Installation Notes
-
-This repo does not yet include packaging metadata. For now, keep the parent directory of `MLProj` on your `PYTHONPATH`, or add packaging later with `pyproject.toml`.
-
-Core dependencies depend on which models you use:
+Stratum requires Python 3.12 or newer.
 
 ```bash
-pip install numpy pandas scikit-learn scikit-optimize optuna imbalanced-learn
-pip install xgboost lightgbm catboost
+git clone https://github.com/VedMakes/Stratum
+cd Stratum
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ".[test]"
+python -m pytest
 ```
 
-Optional explanation/plotting dependencies:
+Smoke-check the MCP entrypoint:
 
 ```bash
-pip install shap yellowbrick seaborn matplotlib dtreeviz statsmodels
+stratum-mcp --help
+stratum-mcp --version
 ```
 
-CUDA support is explicit opt-in and requires RAPIDS packages such as `cudf`, `cupy`, and `cuml`. Install RAPIDS using the official instructions for your CUDA/Python version.
+For only the core ML library, install without extras:
 
-## Quick Start
+```bash
+python -m pip install -e .
+```
+
+## MCP Setup
+
+After installation, configure your MCP client to launch `stratum-mcp`:
+
+```json
+{
+  "mcpServers": {
+    "stratum": {
+      "command": "stratum-mcp"
+    }
+  }
+}
+```
+
+If your client does not inherit the virtualenv `PATH`, use the absolute script
+path instead, for example:
+
+```json
+{
+  "mcpServers": {
+    "stratum": {
+      "command": "/path/to/Stratum/.venv/bin/stratum-mcp"
+    }
+  }
+}
+```
+
+For isolated local runs:
+
+```bash
+export STRATUM_HOME=/tmp/stratum-home
+export STRATUM_DB_PATH=/tmp/stratum-home/sessions.db
+export MPLCONFIGDIR=/tmp/matplotlib
+```
+
+## Optional LLM Tools
+
+Only `stratum_engineer` and `stratum_explain` use an LLM provider. All profiling,
+auditing, splitting, training, validation, prediction, comparison, export, and
+reporting tools are local.
+
+Install a provider extra when you want LLM-backed feature ideas or narrative
+explanations:
+
+```bash
+python -m pip install -e ".[llm-openai]"
+# or
+python -m pip install -e ".[llm-anthropic]"
+```
+
+Configure provider-neutral environment variables:
+
+```bash
+export STRATUM_LLM_PROVIDER=openai
+export STRATUM_LLM_MODEL=your-model
+export STRATUM_LLM_API_KEY=your-key
+```
+
+Provider-specific variables such as `OPENAI_API_KEY`, `OPENAI_MODEL`,
+`ANTHROPIC_API_KEY`, and `ANTHROPIC_MODEL` are also accepted.
+
+## Agent Workflow
+
+1. Start with `stratum_status` to recover prior runs, decisions, and current best
+   model for the session.
+2. Profile and contract the dataset with `stratum_profile`.
+3. Audit data risks with `stratum_audit`, `stratum_leakage_deep`,
+   `stratum_label_quality`, `stratum_join_check`, and `stratum_schema_check`.
+4. Use `stratum_next_action`, `stratum_decisions`, `stratum_create_decision`, and
+   `stratum_resolve_decision` when the agent needs user judgement.
+5. Split data with `stratum_split`, then check contamination with
+   `stratum_contamination`.
+6. Train with `stratum_train`, validate with `stratum_validate`, and investigate
+   weak areas with `stratum_segments` and `stratum_stability`.
+7. Score new data with `stratum_predict`, monitor drift with
+   `stratum_drift_current`, compare runs with `stratum_compare`, export with
+   `stratum_export`, and summarize the trail with `stratum_report`.
+
+## MCP Tool Map
+
+Session and decision tools:
+
+- `stratum_status`
+- `stratum_next_action`
+- `stratum_create_decision`
+- `stratum_decisions`
+- `stratum_resolve_decision`
+- `stratum_log_event`
+- `stratum_journal`
+
+Data and guardrail tools:
+
+- `stratum_profile`
+- `stratum_schema_check`
+- `stratum_split`
+- `stratum_drift`
+- `stratum_drift_current`
+- `stratum_audit`
+- `stratum_leakage_deep`
+- `stratum_label_quality`
+- `stratum_contamination`
+- `stratum_join_check`
+
+Modelling and analysis tools:
+
+- `stratum_engineer`
+- `stratum_train`
+- `stratum_validate`
+- `stratum_segments`
+- `stratum_stability`
+- `stratum_predict`
+- `stratum_explain`
+- `stratum_compare`
+- `stratum_export`
+- `stratum_report`
+
+## Direct MLProj Usage
+
+MLProj gives the local modelling layer a stable Python API. Use it directly when
+you want ordinary script/notebook control without the MCP loop.
 
 ```python
 from MLProj import train
@@ -71,9 +185,27 @@ metrics = result.evaluate(X_test, y_test)
 print(metrics)
 ```
 
-## Hyperparameter Tuning
+Supported classification and regression models:
 
-Set `tune=True` to use Optuna. Presets control trial count, timeout, and whether cross-validation is used.
+- `random_forest` aliases: `rf`, `forest`
+- `xgboost` aliases: `xgb`
+- `lightgbm` aliases: `lgbm`, `lgb`
+- `catboost` aliases: `cat`
+- `svm` aliases: `svc`, `svr`
+- `knn` aliases: `nearest_neighbors`, `k_neighbors`
+
+Classification only:
+
+- `logistic_regression` aliases: `logreg`, `logistic`, `lr`
+
+Regression only:
+
+- `polynomial_regression` aliases: `multireg`, `multi_reg`, `elastic_poly`
+
+## Tuning And Metrics
+
+Set `tune=True` to use Optuna. Presets control trial count, timeout, and whether
+cross-validation is used.
 
 ```python
 result = train(
@@ -107,189 +239,49 @@ result = train(
     n_trials=100,
     timeout=1800,
     crossval=True,
-)
-```
-
-## Built-In Metrics
-
-Classification:
-
-- `accuracy`
-- `f1`
-- `roc_auc`
-
-Regression:
-
-- `rmse`
-- `mse`
-- `mae`
-- `r2`
-
-```python
-result = train(
-    "classification",
-    "logreg",
-    X_train,
-    y_train,
-    tune=True,
     metric="f1",
 )
 ```
 
-## Custom Losses and Scorers
+Built-in metrics include `accuracy`, `f1`, and `roc_auc` for classification, and
+`rmse`, `mse`, `mae`, and `r2` for regression. Custom metrics are supported by
+passing a callable with `metric_direction="minimize"` or
+`metric_direction="maximize"`.
 
-Custom loss functions are lower-is-better by default:
+## Privacy And Storage
 
-```python
-def weighted_error(y_true, y_pred):
-    return ((y_true != y_pred) * 2.0).mean()
+Raw data and row-level values stay on the machine. The journal stores structured
+session summaries and payloads, not full raw conversation transcripts. LLM calls,
+when enabled, use column metadata, aggregate counts, saved metrics, feature
+rankings, and error summaries; PII-like column names are masked before
+transmission. Calls degrade to local results when the provider, key, model, SDK,
+or API is unavailable.
 
-result = train(
-    "classification",
-    "random_forest",
-    X_train,
-    y_train,
-    tune=True,
-    metric=weighted_error,
-    metric_direction="minimize",
-)
-```
+By default, fitted models are stored under `~/.stratum/models` and sessions under
+`~/.stratum/sessions.db`. Override both with `STRATUM_HOME`, or only the database
+with `STRATUM_DB_PATH`.
 
-Score-like functions should be marked as higher-is-better:
+Only load `.joblib` artifacts from trusted sources and compatible dependency
+versions.
 
-```python
-def custom_accuracy(y_true, y_pred):
-    return (y_true == y_pred).mean()
+## Project Layout
 
-result = train(
-    "classification",
-    "svm",
-    X_train,
-    y_train,
-    tune=True,
-    metric=custom_accuracy,
-    metric_direction="maximize",
-)
-```
+- `stratum/`: MCP orchestration, tools, sessions, privacy, reports, and artifacts.
+- `api.py`: high-level MLProj `train()` facade.
+- `base_model.py`: shared model lifecycle, scoring, tuning, and CUDA routing.
+- `registry.py`: model names, aliases, and task support.
+- `result.py`: returned training result object.
+- `ensemble.py`: ensemble search and voting.
+- `statistical/`: statistical and tabular model wrappers.
+- `tests/`: regression tests for the MCP tools and MLProj integration.
 
-For probability or decision-score metrics, use `metric_response="score"`:
+## Testing
 
-```python
-from sklearn.metrics import roc_auc_score
-
-result = train(
-    "classification",
-    "xgboost",
-    X_train,
-    y_train,
-    tune=True,
-    metric=roc_auc_score,
-    metric_direction="maximize",
-    metric_response="score",
-)
-```
-
-The direct wrapper API exposes the same route:
-
-```python
-from MLProj import RandomForestModel
-
-model = RandomForestModel(mode="Classifier")
-model.set_loss_function(weighted_error, direction="minimize")
-model.optimize(X_train, y_train)
-model.fit()
-```
-
-## CUDA Usage
-
-CUDA is disabled by default. You must explicitly request it:
-
-```python
-result = train(
-    "classification",
-    "random_forest",
-    X_train,
-    y_train,
-    supports_cuda=True,
-)
-```
-
-When `supports_cuda=True`, the base pipeline checks for RAPIDS dependencies and ports training data through cuDF/cuML where the model supports it. If RAPIDS is missing, construction fails early instead of silently falling back to CPU.
-
-Current CUDA notes:
-
-- `random_forest`, `knn`, `logistic_regression`, and `svm` use cuML routes where supported.
-- `xgboost`, `lightgbm`, and `catboost` use their native GPU options when requested.
-- `polynomial_regression` rejects CUDA for now.
-- SMOTE and explanation plots are CPU-only and are blocked in CUDA mode.
-- Ensemble stacking is CPU-only; CUDA-backed models should use hard or soft voting.
-
-## Ensembles
-
-`Ensemble` accepts fitted models or `TrainingResult` objects, evaluates model subsets, and chooses the best voting strategy.
-
-```python
-from MLProj import Ensemble
-
-rf = train("classification", "random_forest", X_train, y_train)
-xgb = train("classification", "xgboost", X_train, y_train)
-lgb = train("classification", "lightgbm", X_train, y_train)
-
-ensemble = Ensemble(
-    models=[rf, xgb, lgb],
-    X_train=X_train,
-    y_train=y_train,
-    X_test=X_valid,
-    y_test=y_valid,
-)
-
-ensemble.ensemble_auto("auto")
-print(ensemble.summary())
-predictions = ensemble.predict(X_test)
-```
-
-Hard, soft, and stacking are supported for CPU-backed models. Soft voting and stacking require models with `predict_proba`.
-
-Custom ensemble losses work the same way:
-
-```python
-ensemble.set_loss_function(weighted_error, direction="minimize")
-ensemble.ensemble_auto("hard")
-```
-
-## Result Object
-
-`train()` returns a `TrainingResult`:
-
-```python
-result.predict(X_test)
-result.predict_proba(X_test)
-result.score(X_test, y_test)
-result.evaluate(X_test, y_test)
-result.best_params
-result.study
-result.feature_names
-result.unwrap()
-```
-
-Use `unwrap()` when you need direct access to the underlying wrapper.
-
-## Discovering Models
-
-```python
-from MLProj import available_models, model_info
-
-print(available_models())
-print(available_models("classification"))
-print(model_info("regression"))
-```
-
-## Development
-
-Run a syntax check:
+Run the suite with:
 
 ```bash
-python -m py_compile *.py statistical/*.py
+python -m pytest
 ```
 
-The neural-network files under `Neural/` are placeholders for now.
+Test caches, coverage files, JUnit XML, and local result folders are ignored by
+Git. The `tests/` directory itself is intentionally tracked.

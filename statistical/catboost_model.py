@@ -54,12 +54,14 @@ class CatBoostModel(BaseModel):
             raise RuntimeError("model does not support prediction. Ensure it is fitted before SHAP explanation.")
         
         X, y = self.train_X, self.train_y
-        
-        explainer = shap.Explainer(self._best_model)
-        shap_values = explainer(X)
-        
-        shap.summary_plot(shap_values, X)
-        shap.dependence_plot(0, shap_values, X)
+        estimator = self.final_estimator()
+        transformed_X = self.transform_features(X)
+
+        explainer = shap.Explainer(estimator)
+        shap_values = explainer(transformed_X)
+
+        shap.summary_plot(shap_values, transformed_X)
+        shap.dependence_plot(0, shap_values, transformed_X)
         
         print("SHAP values calculated for the best model.")
         return shap_values
