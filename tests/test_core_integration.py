@@ -123,3 +123,55 @@ def test_model_cv_passes_group_labels_to_sklearn(monkeypatch):
     assert wrapper._cpu_cross_val_score(X, y, {}, splitter) == 0.5
     assert observed["cv"] is splitter
     assert np.array_equal(observed["groups"], groups)
+
+
+def test_smote_resamples_only_each_cv_training_fold(monkeypatch):
+    from sklearn.base import BaseEstimator
+    import imblearn.over_sampling
+    from MLProj.statistical.logreg import LogRegModel
+
+    observed_rows = []
+
+    class RecordingSampler(BaseEstimator):
+        def __init__(self, random_state=None):
+            self.random_state = random_state
+
+        def fit_resample(self, X, y):
+            observed_rows.append(X.iloc[:, 0].astype(int).tolist())
+            return X, y
+
+    monkeypatch.setattr(imblearn.over_sampling, "SMOTE", RecordingSampler)
+    X = pd.DataFrame({"row_id": range(30), "signal": np.arange(30) % 3})
+    y = pd.Series([0] * 24 + [1] * 6)
+    wrapper = LogRegModel(mode="Classifier", crossval=True, use_smote=True)
+    X_prepared, y_prepared = wrapper._prepare_training_data(X, y)
+    wrapper.set_loss_function("accuracy")
+    wrapper.n_jobs = 1
+
+    assert len(X_prepared) == len(X)
+    assert len(y_prepared) == len(y)
+    wrapper._cpu_cross_val_score(X_prepared, y_prepared, {}, 3)
+
+    assert len(observed_rows) == 3
+    assert all(len(rows) == 20 for rows in observed_rows)
+    assert all(set(rows) < set(range(30)) for rows in observed_rows)
+
+
+def test_smote_pipeline_fits_and_predicts_with_categorical_features():
+    X = pd.DataFrame({
+        "amount": np.arange(40, dtype=float),
+        "segment": ["a", "b"] * 20,
+    })
+    y = pd.Series([0] * 32 + [1] * 8)
+
+    result = train(
+        "classification", "logistic_regression", X, y, tune=False,
+        use_smote=True, params={"max_iter": 200},
+    )
+
+    assert [name for name, _ in result.estimator.steps] == [
+        "imputer", "encoder", "smote", "scaler", "model",
+    ]
+    assert len(result.predict(X)) == len(X)
+    importance = result.get_feature_importance(X, y)
+    assert {item["name"] for item in importance} == {"amount", "segment_b"}

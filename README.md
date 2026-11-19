@@ -276,14 +276,22 @@ Built-in metrics include `accuracy`, `f1`, and `roc_auc` for classification, and
 passing a callable with `metric_direction="minimize"` or
 `metric_direction="maximize"`.
 
+For imbalanced classification, pass `use_smote=True`. Resampling runs inside
+the model pipeline after fold-specific imputation and encoding, so CV validation
+folds and holdout rows remain untouched. The final fitted pipeline resamples
+only the data passed to its training fit.
+
 ## Privacy And Storage
 
 Raw data and row-level values stay on the machine. The journal stores structured
-session summaries and payloads, not full raw conversation transcripts. LLM calls,
-when enabled, use column metadata, aggregate counts, saved metrics, feature
-rankings, and error summaries; PII-like column names are masked before
-transmission. Calls degrade to local results when the provider, key, model, SDK,
-or API is unavailable.
+session summaries and payloads, not full raw conversation transcripts. When
+enabled, LLM calls use aggregate schema statistics, anonymized target-class
+counts, the user's goal or question, saved metrics and feature names, and
+minimized decision status. Raw target labels, resolved-flag comments/reasoning,
+and data-derived error trees are excluded. Known sensitive column names and
+common email, SSN, UUID, and labeled identifier patterns are redacted, but
+heuristics cannot identify every sensitive value. Calls degrade to local results
+when the provider, key, model, SDK, or API is unavailable.
 
 By default, fitted models are stored under `~/.stratum/models` and sessions under
 `~/.stratum/sessions.db`. Override both with `STRATUM_HOME`, or only the database

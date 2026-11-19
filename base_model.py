@@ -286,6 +286,7 @@ class BaseModel(ABC):
         self.verbose = verbose
         self._standardize = needs_scaling
         self._use_smote = use_smote
+        self._smote_enabled = False
         self._requested_CUDA = supports_cuda
         self._enable_CUDA = bool(supports_cuda)
 
@@ -487,7 +488,13 @@ class BaseModel(ABC):
         if model is None:
             raise RuntimeError("No model is available.")
         if hasattr(model, "steps") and len(model.steps) > 1:
-            return model[:-1].transform(X)
+            transformed = X
+            for _, step in model.steps[:-1]:
+                if hasattr(step, "fit_resample"):
+                    continue
+                if hasattr(step, "transform"):
+                    transformed = step.transform(transformed)
+            return transformed
         return X
 
     def feature_names(self, X=None, model=None):
@@ -495,6 +502,9 @@ class BaseModel(ABC):
         model = model or self._best_model
 
         if hasattr(model, "named_steps"):
+            encoder = model.named_steps.get("encoder")
+            if encoder is not None and getattr(encoder, "columns_", None) is not None:
+                return list(encoder.columns_)
             try:
                 return list(model[:-1].get_feature_names_out())
             except Exception:
@@ -682,8 +692,11 @@ class BaseModel(ABC):
             self.param_search_space = {}
 
     def _prepare_training_data(self, X, y):
-        X_train, y_train = self._apply_smote(X, y)
+        self._smote_enabled = self._check_imbalance_and_prompt(y)
+        X_train, y_train = X, y
         if self._enable_CUDA:
+            if self._smote_enabled:
+                raise RuntimeError("SMOTE currently uses a CPU implementation; disable SMOTE for CUDA training.")
             X_train, y_train = self._port_data_to_cuda(X_train, y_train, fit=True)
             if self.verbose >= 1:
                 print("Data ported to GPU using cuDF.")
@@ -741,14 +754,26 @@ class BaseModel(ABC):
 
         steps = [(
             "imputer",
-            DataFrameImputer(categorical_as_category=self._model_supports_categoricals()),
+            DataFrameImputer(
+                categorical_as_category=(
+                    self._model_supports_categoricals() and not self._smote_enabled
+                )
+            ),
         )]
-        if not self._model_supports_categoricals():
+        if not self._model_supports_categoricals() or self._smote_enabled:
             steps.append(("encoder", DummyEncoder()))
+        if self._smote_enabled:
+            from imblearn.over_sampling import SMOTE
+
+            steps.append(("smote", SMOTE(random_state=42)))
         if self._standardize:
             steps.append(("scaler", StandardScaler()))
         steps.append(("model", model))
 
+        if self._smote_enabled:
+            from imblearn.pipeline import Pipeline as ImbalancedPipeline
+
+            return ImbalancedPipeline(steps)
         return Pipeline(steps)
 
     def _cross_val_score(self, params):
@@ -829,22 +854,6 @@ class BaseModel(ABC):
         answer = input("Apply SMOTE? (yes/no): ").strip().lower()
         self._use_smote = answer in {"yes", "y"}
         return self._use_smote
-
-    def _apply_smote(self, X, y):
-        if self._enable_CUDA and self._use_smote:
-            raise RuntimeError("SMOTE currently uses a CPU implementation; disable SMOTE for CUDA training.")
-        if not self._check_imbalance_and_prompt(y):
-            return X, y
-
-        from imblearn.over_sampling import SMOTE
-
-        if hasattr(X, "select_dtypes") and X.select_dtypes(include=["object", "category"]).shape[1] > 0:
-            X = DummyEncoder().fit_transform(X)
-
-        X_resampled, y_resampled = SMOTE(random_state=42).fit_resample(X, y)
-        if self.verbose >= 1:
-            print(f"Applied SMOTE: resampled to {X_resampled.shape[0]} rows.")
-        return X_resampled, y_resampled
 
     def _stratify_target(self, y):
         if self._mode != "Classifier":

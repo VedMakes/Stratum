@@ -85,15 +85,14 @@ regression tests before being described as runtime failures.
 - At the M0 baseline, `sanitise_for_api()` included raw target labels and
   outbound contexts included data-derived error trees and free-text decision
   reasoning/comments. M1-03 below minimizes and tests these payloads.
-- In MLProj, `_prepare_training_data()` applies SMOTE before
-  `cross_val_score()` creates CV folds. This allows resampled observations to
-  be distributed across folds. The same method can prompt through `input()` for
-  imbalanced data, which is unsuitable for unattended MCP execution.
+- At the M0 baseline, MLProj applied SMOTE before CV folds were created. The
+  fold-local sampler fix below closes that resampling leakage path. The legacy
+  optional interactive prompt remains unsuitable for unattended callers when
+  `use_smote=None` is explicitly selected.
 - `dispatch_tool()` calls synchronous handlers inline. Long training or tuning
   work can occupy the async server event loop.
-- The source package `stratum/data/` and CI workflow are currently visible in
-  the worktree but not committed. Installation tests included the local source
-  package by overlaying it into the temporary clone.
+- The source package and CI workflow were verified in the working tree and are
+  now committed in the repository history.
 
 ## Next Linear Tasks
 
@@ -150,6 +149,20 @@ M1-03 privacy boundary is implemented in the current worktree:
 - Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
   **73 passed** in 4.75 seconds.
 
-Next linear task: move resampling inside the cross-validation fold boundary and
-add a regression test for leakage, as specified in Milestone 1.
+Milestone 1 resampling fix is implemented:
+
+- MLProj keeps original rows intact through split planning and evaluation.
+  When enabled, an imbalanced-learn pipeline performs imputation and encoding,
+  then SMOTE, then scaling/model fitting. During CV, each sampler is fit only on
+  that fold's training indices; validation folds remain untouched.
+- The final fitted pipeline samples only its training input, and its sampler is
+  skipped for prediction and feature transformation. Feature importance retains
+  encoded feature names.
+- Regression coverage records row IDs seen by each fold-local sampler, checks
+  an actual categorical-data SMOTE fit/predict path, and verifies feature names.
+- Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
+  **75 passed** in 5.06 seconds.
+
+Next linear task: add end-to-end agent workflow tests, including direct bypass
+attempts, as specified in Milestone 1.
 
