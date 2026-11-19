@@ -9,12 +9,15 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin, clone, is_classifier
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     balanced_accuracy_score,
+    brier_score_loss,
     f1_score,
     make_scorer,
     mean_absolute_error,
     mean_squared_error,
     precision_score,
+    precision_recall_fscore_support,
     r2_score,
     recall_score,
     roc_auc_score,
@@ -869,6 +872,11 @@ class BaseModel(ABC):
             y_pred = self.predict(X_test)
         y_test_metric = self._as_metric_array(y_test)
         y_pred_metric = self._as_metric_array(y_pred)
+        classes = getattr(self._best_model, "classes_", np.unique(y_test_metric))
+        classes = self._as_metric_array(classes)
+        per_class = precision_recall_fscore_support(
+            y_test_metric, y_pred_metric, labels=classes, zero_division=0
+        )
         metrics = {
             "accuracy": float(accuracy_score(y_test_metric, y_pred_metric)),
             "balanced_accuracy": float(balanced_accuracy_score(y_test_metric, y_pred_metric)),
@@ -877,6 +885,15 @@ class BaseModel(ABC):
                 precision_score(y_test_metric, y_pred_metric, average="weighted", zero_division=0)
             ),
             "recall_weighted": float(recall_score(y_test_metric, y_pred_metric, average="weighted", zero_division=0)),
+            "per_class": {
+                str(label): {
+                    "precision": float(per_class[0][index]),
+                    "recall": float(per_class[1][index]),
+                    "f1": float(per_class[2][index]),
+                    "support": int(per_class[3][index]),
+                }
+                for index, label in enumerate(classes)
+            },
         }
 
         try:
@@ -889,11 +906,23 @@ class BaseModel(ABC):
                     return metrics
                 y_score = self._as_metric_array(y_score)
                 if getattr(y_score, "ndim", 1) == 2 and y_score.shape[1] == 2:
-                    metrics["roc_auc"] = float(roc_auc_score(y_test_metric, y_score[:, 1]))
-                elif getattr(y_score, "ndim", 1) == 2:
-                    metrics["roc_auc_ovr_weighted"] = float(
-                        roc_auc_score(y_test_metric, y_score, multi_class="ovr", average="weighted")
-                    )
+                    metrics["positive_class"] = str(classes[1])
+                    binary_true = (y_test_metric == classes[1]).astype(int)
+                    metrics["pr_auc"] = float(average_precision_score(binary_true, y_score[:, 1]))
+                    metrics["brier_score"] = float(brier_score_loss(binary_true, y_score[:, 1]))
+                    try:
+                        metrics["roc_auc"] = float(roc_auc_score(binary_true, y_score[:, 1]))
+                    except ValueError:
+                        pass
+                elif getattr(y_score, "ndim", 1) == 2 and len(classes) > 2:
+                    one_hot = np.column_stack([y_test_metric == label for label in classes]).astype(float)
+                    metrics["brier_score"] = float(np.mean(np.sum((y_score - one_hot) ** 2, axis=1)))
+                    try:
+                        metrics["roc_auc_ovr_weighted"] = float(
+                            roc_auc_score(y_test_metric, y_score, labels=classes, multi_class="ovr", average="weighted")
+                        )
+                    except ValueError:
+                        pass
         except ValueError:
             pass
 

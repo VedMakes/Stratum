@@ -175,6 +175,23 @@ Milestone 1 end-to-end workflow coverage is implemented:
 - Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
   **76 passed** in 5.48 seconds.
 
-Next linear task: Milestone 2 methodological evaluation, beginning with
-task-appropriate baseline comparisons and metrics.
+Milestone 2 baseline comparison and task metrics are implemented:
+
+- Training compares each fitted model against a majority-prior `DummyClassifier`
+  or mean `DummyRegressor`, fit only on the training partition and evaluated on
+  the same untouched holdout. Results record the baseline metrics and a
+  direction-aware improvement score.
+- Classification reports per-class precision/recall/F1/support, balanced
+  accuracy, positive-class identity, ROC-AUC when defined, binary average
+  precision (PR-AUC), and Brier score when probabilities are available.
+  Regression reports MAE, MSE, RMSE, and R-squared.
+- Evaluation warnings surface small holdouts, rare or missing classes, and
+  substantial training imbalance. Run records persist the evaluation summary;
+  status/report expose baseline comparison and warnings. Run comparison ignores
+  nested per-class summaries when calculating scalar metric deltas.
+- Full-suite verification: `.venv/bin/python -m pytest -q` passed:
+  **79 passed** in 5.88 seconds.
+
+Next linear task: add repeated or uncertainty-aware evaluation and ensure its
+protocol is saved and reproducible, as specified in Milestone 2.
 

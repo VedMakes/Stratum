@@ -24,7 +24,10 @@ def run_validate(
         return error
     try:
         predictions, scores = predict_scores(estimator, X)
-        metrics = evaluate_predictions(run["task"], y, predictions, scores)
+        metrics = evaluate_predictions(
+            run["task"], y, predictions, scores,
+            class_labels=getattr(estimator, "classes_", None),
+        )
     except Exception as exc:
         return {"error": f"Validation failed: {type(exc).__name__}: {exc}"}
 

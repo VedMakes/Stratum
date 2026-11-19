@@ -4,6 +4,7 @@ import pandas as pd
 from stratum.session import create_session, get_run
 from stratum.data.splitter import run_split
 from stratum.tools import tool_train
+from stratum.tools.tool_train import _baseline_evaluation
 
 
 class FakeModel:
@@ -84,6 +85,9 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     assert saved_run["metrics"] == result["metrics"]
     assert saved_run["split_metadata"]["split_id"] == split["split_id"]
     assert saved_run["split_metadata"]["strategy"] == "stratified"
+    assert saved_run["evaluation"]["baseline"]["name"] == "prior_dummy"
+    assert saved_run["evaluation"]["comparison"]["metric"] == "accuracy"
+    assert "Holdout has only" in saved_run["evaluation"]["warnings"][0]
 
     internal = tool_train.run_train(
         str(binary_csv), "target", model="rf", task="auto", sid=split["sid"]
@@ -171,6 +175,30 @@ def test_core_policy_defaults():
     regression = resolve_training_policy(pd.Series(np.linspace(0, 1, 30)), 100)
     assert classification.model == "logistic_regression"
     assert regression.model == "random_forest"
+
+
+def test_regression_baseline_uses_mean_and_reports_directional_improvement():
+    evaluation = _baseline_evaluation(
+        "regression",
+        pd.Series([0.0, 2.0, 4.0, 6.0]),
+        pd.Series([1.0, 1.0, 5.0]),
+        {"rmse": .5, "mae": .4},
+    )
+
+    assert evaluation["baseline"]["name"] == "mean_dummy"
+    assert evaluation["baseline"]["metrics"]["rmse"] == 2.0
+    assert evaluation["comparison"]["direction"] == "minimize"
+    assert evaluation["comparison"]["improvement"] == 1.5
+    assert evaluation["comparison"]["model_beats_baseline"] is True
+
+
+def test_classification_baseline_warns_for_missing_or_rare_holdout_classes():
+    evaluation = _baseline_evaluation(
+        "classification", pd.Series([0] * 20 + [1] * 5), pd.Series([0] * 10 + [1]),
+        {"accuracy": .9, "f1_weighted": .9},
+    )
+
+    assert any("fewer than 5 rows" in warning for warning in evaluation["warnings"])
 
 
 def test_direct_training_call_is_blocked_by_pending_domain_decision(binary_csv, monkeypatch):

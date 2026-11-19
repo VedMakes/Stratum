@@ -91,6 +91,8 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
             "date": run["created_at"],
             "split_id": (run.get("split_metadata") or {}).get("split_id"),
             "split_strategy": (run.get("split_metadata") or {}).get("strategy"),
+            "baseline_comparison": (run.get("evaluation") or {}).get("comparison"),
+            "evaluation_warnings": (run.get("evaluation") or {}).get("warnings", []),
         }
         if metric:
             compact[metric] = value

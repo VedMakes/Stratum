@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from stratum.session import create_decision, create_session, save_run
 from stratum.tools.tool_compare import run_compare
@@ -15,7 +16,9 @@ class Result:
 
 
 def _save(sid, model_id, accuracy):
-    save_run(sid, model_id, Result(), {"accuracy": accuracy}, metadata={
+    save_run(sid, model_id, Result(), {
+        "accuracy": accuracy, "per_class": {"1": {"f1": accuracy}},
+    }, metadata={
         "model_name": "random_forest", "task": "classification",
         "best_params": {"n_estimators": 10}, "top_features": [{"name": "x", "importance": 1}],
         "feature_names": ["x"], "feature_dtypes": {"x": "float64"},
@@ -28,7 +31,10 @@ def test_compare_and_export(tmp_path):
     sid = create_session("/tmp/data.csv", "target")
     _save(sid, "a", .7)
     _save(sid, "b", .8)
-    assert run_compare("a", "b")["winner"] == "b"
+    comparison = run_compare("a", "b")
+    assert comparison["winner"] == "b"
+    assert comparison["metric_delta"]["accuracy"] == pytest.approx(.1)
+    assert "per_class" not in comparison["metric_delta"]
     output = tmp_path / "export.py"
     exported = run_export("b", str(output))
     assert Path(exported["script_path"]).exists()

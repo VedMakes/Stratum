@@ -8,6 +8,7 @@ from stratum.tools.tool_report import run_report
 from stratum.tools.tool_segments import run_segments
 from stratum.tools.tool_stability import run_stability
 from stratum.tools.tool_validate import run_validate
+from stratum.tools.eval_common import classification_metrics
 
 
 class Result:
@@ -58,8 +59,25 @@ def test_validate_returns_metrics_and_confusion_matrix(tmp_path):
 
     assert result["rows_evaluated"] == 80
     assert "accuracy" in result["metrics"]
+    assert set(result["metrics"]["per_class"]) == {"0", "1"}
+    assert "pr_auc" in result["metrics"]
+    assert "brier_score" in result["metrics"]
     assert result["confusion_matrix"]["labels"] == ["0", "1"]
     assert result["calibration_bins"]
+
+
+def test_probability_metrics_support_string_classes():
+    metrics = classification_metrics(
+        ["no", "yes", "no", "yes"],
+        ["no", "yes", "no", "no"],
+        np.array([[.9, .1], [.1, .9], [.8, .2], [.4, .6]]),
+        class_labels=["no", "yes"],
+    )
+
+    assert metrics["per_class"]["yes"]["support"] == 2
+    assert metrics["positive_class"] == "yes"
+    assert metrics["pr_auc"] > .9
+    assert metrics["brier_score"] < .1
 
 
 def test_segments_finds_bad_group(tmp_path):

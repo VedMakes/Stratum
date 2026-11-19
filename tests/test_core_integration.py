@@ -24,6 +24,10 @@ def test_core_pipeline_owns_imputation_encoding_and_scaling():
     assert len(result.predict(X)) == len(X)
     assert result.get_pipeline_spec()["steps"][0]["class"] == "DataFrameImputer"
     assert result.get_feature_importance(X, y)
+    metrics = result.evaluate(X, y)
+    assert set(metrics["per_class"]) == {"0", "1"}
+    assert "pr_auc" in metrics
+    assert "brier_score" in metrics
 
 
 def test_core_policy_rejects_unsupported_model_task():

@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     balanced_accuracy_score,
+    brier_score_loss,
     confusion_matrix,
     f1_score,
     mean_absolute_error,
@@ -61,22 +63,54 @@ def predict_scores(estimator, X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray |
     return predictions, scores
 
 
-def classification_metrics(y_true, y_pred, y_score=None) -> dict:
+def classification_metrics(y_true, y_pred, y_score=None, class_labels=None) -> dict:
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    labels = list(class_labels) if class_labels is not None else list(pd.unique(y_true))
+    precision = precision_score(y_true, y_pred, labels=labels, average=None, zero_division=0)
+    recall = recall_score(y_true, y_pred, labels=labels, average=None, zero_division=0)
+    f1 = f1_score(y_true, y_pred, labels=labels, average=None, zero_division=0)
+    support = np.asarray([(y_true == label).sum() for label in labels])
     metrics = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
         "f1_weighted": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
         "precision_weighted": float(precision_score(y_true, y_pred, average="weighted", zero_division=0)),
         "recall_weighted": float(recall_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "per_class": {
+            str(label): {
+                "precision": float(precision[index]),
+                "recall": float(recall[index]),
+                "f1": float(f1[index]),
+                "support": int(support[index]),
+            }
+            for index, label in enumerate(labels)
+        },
     }
     if y_score is not None:
+        y_score = np.asarray(y_score)
         try:
-            if getattr(y_score, "ndim", 1) == 2 and y_score.shape[1] == 2:
-                metrics["roc_auc"] = float(roc_auc_score(y_true, y_score[:, 1]))
-            elif getattr(y_score, "ndim", 1) == 2:
-                metrics["roc_auc_ovr_weighted"] = float(
-                    roc_auc_score(y_true, y_score, multi_class="ovr", average="weighted")
-                )
+            if y_score.ndim != 2 or y_score.shape[1] != len(labels):
+                return metrics
+            if len(labels) == 2:
+                positive = labels[1]
+                metrics["positive_class"] = str(positive)
+                binary_true = (y_true == positive).astype(int)
+                metrics["pr_auc"] = float(average_precision_score(binary_true, y_score[:, 1]))
+                metrics["brier_score"] = float(brier_score_loss(binary_true, y_score[:, 1]))
+                try:
+                    metrics["roc_auc"] = float(roc_auc_score(binary_true, y_score[:, 1]))
+                except ValueError:
+                    pass
+            elif len(labels) > 2:
+                one_hot = np.column_stack([y_true == label for label in labels]).astype(float)
+                metrics["brier_score"] = float(np.mean(np.sum((y_score - one_hot) ** 2, axis=1)))
+                try:
+                    metrics["roc_auc_ovr_weighted"] = float(
+                        roc_auc_score(y_true, y_score, labels=labels, multi_class="ovr", average="weighted")
+                    )
+                except ValueError:
+                    pass
         except ValueError:
             pass
     return metrics
@@ -92,10 +126,10 @@ def regression_metrics(y_true, y_pred) -> dict:
     }
 
 
-def evaluate_predictions(task: str, y_true, y_pred, y_score=None) -> dict:
+def evaluate_predictions(task: str, y_true, y_pred, y_score=None, class_labels=None) -> dict:
     if task == "regression":
         return regression_metrics(y_true, y_pred)
-    return classification_metrics(y_true, y_pred, y_score)
+    return classification_metrics(y_true, y_pred, y_score, class_labels)
 
 
 def confusion_summary(y_true, y_pred) -> dict:

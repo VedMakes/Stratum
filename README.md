@@ -143,7 +143,10 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
    not invalidate earlier split IDs. Training without a `split_id` retains a
    deterministic internal holdout and records its strategy. Tuning from group
    and temporal splits uses GroupKFold and TimeSeriesSplit respectively;
-   predefined splits reject exact row-value overlap across partitions. Validate with
+   predefined splits reject exact row-value overlap across partitions. Training
+   compares against a majority-prior classifier or mean-prediction regressor on
+   the same holdout, and returns per-class scores, probability metrics when
+   supported, and evaluation warnings. Validate with
    `stratum_validate` and investigate weak areas with `stratum_segments` and
    `stratum_stability`.
 7. Score new data with `stratum_predict`, monitor drift with
@@ -270,6 +273,11 @@ result = train(
     metric="f1",
 )
 ```
+
+`result.evaluate(X, y)` returns aggregate and per-class classification metrics.
+When probabilities are available it also reports ROC-AUC, binary PR-AUC
+(average precision, with the positive class identified in the metrics), and
+Brier score. Regression evaluation reports MAE, RMSE, MSE, and R-squared.
 
 Built-in metrics include `accuracy`, `f1`, and `roc_auc` for classification, and
 `rmse`, `mse`, `mae`, and `r2` for regression. Custom metrics are supported by

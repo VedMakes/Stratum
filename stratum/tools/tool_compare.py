@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from numbers import Real
+
 from ..session import get_run
 
 
@@ -26,7 +28,11 @@ def run_compare(model_id_a: str, model_id_b: str, sid: str | None = None) -> dic
     metric_a, value_a, direction_a = _primary(a)
     metric_b, value_b, direction_b = _primary(b)
     common_metrics = set(a["metrics"]) & set(b["metrics"])
-    deltas = {name: float(b["metrics"][name]) - float(a["metrics"][name]) for name in common_metrics}
+    deltas = {
+        name: float(b["metrics"][name]) - float(a["metrics"][name])
+        for name in common_metrics
+        if isinstance(a["metrics"][name], Real) and isinstance(b["metrics"][name], Real)
+    }
     if metric_a != metric_b or direction_a != direction_b:
         winner = "tie"
         reason = "The runs do not share a comparable primary metric."

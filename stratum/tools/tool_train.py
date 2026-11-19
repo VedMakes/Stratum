@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.model_selection import GroupKFold, TimeSeriesSplit, train_test_split
 from sklearn.tree import DecisionTreeClassifier, export_text
 
@@ -12,6 +13,7 @@ from ..common import load_csv, stratum_home
 from ..core import core_policy, core_train
 from ..data.contracts import build_data_contract
 from ..data.splitter import file_sha256, frame_fingerprint
+from .eval_common import evaluate_predictions
 from ..session import (
     ensure_session,
     get_artifacts,
@@ -91,6 +93,62 @@ def _load_saved_split(file: str, target: str, sid: str, split_id: str):
     if train_df[target].isna().any() or test_df[target].isna().any():
         return None, None, None, {"error": "Training and test splits must not contain null target values."}
     return train_df, test_df, manifest, None
+
+
+def _baseline_evaluation(task: str, y_train, y_test, model_metrics: dict) -> dict:
+    dummy = DummyClassifier(strategy="prior") if task == "classification" else DummyRegressor(strategy="mean")
+    dummy.fit(np.zeros((len(y_train), 1)), np.asarray(y_train))
+    baseline_predictions = dummy.predict(np.zeros((len(y_test), 1)))
+    baseline_scores = dummy.predict_proba(np.zeros((len(y_test), 1))) if task == "classification" else None
+    baseline_metrics = evaluate_predictions(
+        task, y_test, baseline_predictions, baseline_scores,
+        class_labels=getattr(dummy, "classes_", None),
+    )
+    metric = "f1_weighted" if task == "classification" else "rmse"
+    if metric not in model_metrics or metric not in baseline_metrics:
+        metric = "accuracy" if task == "classification" else "mae"
+    direction = "maximize" if task == "classification" else "minimize"
+    model_score = float(model_metrics[metric])
+    baseline_score = float(baseline_metrics[metric])
+    raw_delta = model_score - baseline_score
+    improvement = raw_delta if direction == "maximize" else -raw_delta
+
+    warnings = []
+    if len(y_test) < 30:
+        warnings.append(
+            f"Holdout has only {len(y_test)} rows; evaluation metrics may have high uncertainty."
+        )
+    if task == "classification":
+        counts = pd.Series(y_test).value_counts()
+        if len(counts) < 2:
+            warnings.append("Holdout contains only one target class; class-separation metrics are unavailable.")
+        elif int(counts.min()) < 5:
+            warnings.append("At least one holdout class has fewer than 5 rows; per-class metrics are unstable.")
+        train_classes = set(pd.Series(y_train).dropna().unique())
+        test_classes = set(pd.Series(y_test).dropna().unique())
+        if train_classes - test_classes:
+            warnings.append("Holdout is missing target class(es) present in training.")
+        if test_classes - train_classes:
+            warnings.append("Holdout contains target class(es) absent from training; they cannot be learned.")
+        train_counts = pd.Series(y_train).value_counts()
+        if len(train_counts) > 1 and float(train_counts.min() / train_counts.max()) < .1:
+            warnings.append("Training classes are highly imbalanced; inspect per-class recall and PR-AUC.")
+
+    return {
+        "baseline": {
+            "name": "prior_dummy" if task == "classification" else "mean_dummy",
+            "metrics": baseline_metrics,
+        },
+        "comparison": {
+            "metric": metric,
+            "direction": direction,
+            "model_score": model_score,
+            "baseline_score": baseline_score,
+            "improvement": improvement,
+            "model_beats_baseline": improvement > 0,
+        },
+        "warnings": warnings,
+    }
 
 
 def run_train(
@@ -217,6 +275,7 @@ def run_train(
             cv_groups=cv_groups,
         )
         metrics = result.evaluate(X_test, y_test)
+        evaluation = _baseline_evaluation(selected_task, y_train, y_test, metrics)
         top_features = result.get_feature_importance(X_test, y_test)[:20]
         tree_summary = _error_summary(result, X_test, y_test, selected_task)
     except Exception as exc:
@@ -250,6 +309,7 @@ def run_train(
         "artifact_path": str(artifact_path),
         "training_policy": policy.to_dict(),
         "split_metadata": split_metadata,
+        "evaluation": evaluation,
     }
     save_run(sid, model_id, result, metrics, metadata=metadata)
     best = top5[0] if top5 else None
@@ -263,4 +323,5 @@ def run_train(
         "decision_tree_summary": tree_summary, "optuna_summary": optuna_summary,
         "model_path": str(artifact_path), "training_policy": policy.to_dict(),
         "split_metadata": split_metadata,
+        "evaluation": evaluation,
     }

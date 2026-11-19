@@ -188,5 +188,6 @@ def test_agent_workflow_and_direct_guardrail_bypasses(tmp_path, monkeypatch):
     assert report["best_model"] == model_id
     assert {"validation", "segment_analysis", "export_script"} <= set(report["diagnostics"])
     assert status["runs"][0]["split_id"] == split["split_id"]
+    assert status["runs"][0]["baseline_comparison"]["metric"] == "accuracy"
     assert status["blocking_decisions"] == []
     assert status["recent_journal"]
