@@ -21,6 +21,7 @@ def test_decision_lifecycle_blocks_and_records_journal(tmp_path):
         "Should this model optimize recall or precision?",
         "The choice changes thresholding and model selection.",
         options=["recall", "precision", "f1"],
+        safe_answers=["recall", "precision", "f1"],
         recommended="recall",
         blocking=True,
     )
@@ -37,6 +38,7 @@ def test_decision_lifecycle_blocks_and_records_journal(tmp_path):
     journal = run_journal(sid=sid)
 
     assert resolved["decision"]["status"] == "resolved"
+    assert resolved["decision"]["safe_to_proceed"] is True
     assert run_next_action(sid=sid)["recommended_action"] == "continue"
     assert journal["journal"][0]["event_type"] == "decision_resolved"
 
@@ -48,6 +50,8 @@ def test_status_and_report_include_decision_context(tmp_path):
         "temporal_availability",
         "Was invoice_paid_date available before prediction?",
         "Post-outcome dates leak the target.",
+        options=["available_before_prediction", "post_outcome", "unknown"],
+        safe_answers=["available_before_prediction"],
         column="invoice_paid_date",
         blocking=True,
     )
@@ -58,6 +62,54 @@ def test_status_and_report_include_decision_context(tmp_path):
     assert status["pending_decisions"][0]["column_name"] == "invoice_paid_date"
     assert report["pending_decisions"][0]["decision_type"] == "temporal_availability"
     assert report["recent_journal"]
+
+
+def test_blocking_decision_requires_explicit_safe_answers(tmp_path):
+    sid = create_session(str(tmp_path / "data.csv"), "target")
+    result = run_create_decision(
+        sid,
+        "temporal_availability",
+        "Was the feature available before prediction?",
+        "Post-outcome values can leak the target.",
+        blocking=True,
+    )
+    assert "safe_answer" in result["error"]
+
+
+def test_unknown_resolution_does_not_clear_blocking_decision(tmp_path):
+    sid = create_session(str(tmp_path / "data.csv"), "target")
+    created = run_create_decision(
+        sid,
+        "temporal_availability",
+        "Was the feature available before prediction?",
+        "Post-outcome values can leak the target.",
+        options=["available_before_prediction", "post_outcome", "unknown"],
+        safe_answers=["available_before_prediction"],
+        blocking=True,
+    )
+
+    resolved = run_resolve_decision(created["decision_id"], "unknown")
+
+    assert resolved["decision"]["status"] == "resolved"
+    assert resolved["decision"]["safe_to_proceed"] is False
+    assert resolved["decision"]["resolution_state"] == "unknown"
+    next_action = run_next_action(sid=sid)
+    assert next_action["recommended_action"] == "ask_user"
+    assert next_action["decisions"][0]["answer"] == "unknown"
+
+
+def test_unknown_cannot_be_declared_a_safe_answer(tmp_path):
+    sid = create_session(str(tmp_path / "data.csv"), "target")
+    result = run_create_decision(
+        sid,
+        "temporal_availability",
+        "Was the feature available before prediction?",
+        "Post-outcome values can leak the target.",
+        options=["available_before_prediction", "unknown"],
+        safe_answers=["unknown"],
+        blocking=True,
+    )
+    assert "cannot be declared safe" in result["error"]
 
 
 def test_leakage_deep_creates_temporal_decision(tmp_path):

@@ -4,6 +4,7 @@ import pandas as pd
 
 from stratum.session import (
     create_session,
+    create_decision,
     resolve_flag,
     save_artifact,
     save_flag,
@@ -39,6 +40,7 @@ def _save_model_run(tmp_path, sid, model_id, accuracy):
         "feature_names": ["score"],
         "feature_dtypes": {"score": "float64"},
         "artifact_path": str(artifact_path),
+        "split_metadata": {"split_id": "split_saved", "strategy": "group"},
     })
     return artifact_path
 
@@ -74,6 +76,27 @@ def test_predict_requires_trained_features(tmp_path):
     assert "missing required feature columns" in result["error"]
 
 
+def test_predict_is_blocked_by_unresolved_domain_decision(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    _save_model_run(tmp_path, sid, "run_blocked", .8)
+    create_decision(
+        sid,
+        "temporal_availability",
+        "Was the date available before prediction?",
+        "Post-outcome values can leak the target.",
+        options=["available_before_prediction", "post_outcome", "unknown"],
+        safe_answers=["available_before_prediction"],
+        blocking=True,
+    )
+    data = tmp_path / "new.csv"
+    pd.DataFrame({"score": [.2]}).to_csv(data, index=False)
+
+    result = run_predict("run_blocked", str(data), sid=sid)
+
+    assert result["recommended_action"] == "ask_user"
+    assert result["blocked_decisions"]
+
+
 def test_status_summarises_session_by_sid_or_file(tmp_path):
     dataset = tmp_path / "train.csv"
     dataset.write_text("score,target\n.1,0\n.9,1\n", encoding="utf-8")
@@ -98,6 +121,7 @@ def test_status_summarises_session_by_sid_or_file(tmp_path):
     assert by_file["sid"] == sid
     assert by_sid["best_model"] == "best"
     assert by_sid["current_metric"] == "accuracy"
+    assert by_sid["runs"][-1]["split_strategy"] == "group"
     assert by_sid["current_score"] == .84
     assert round(by_sid["improvement"], 2) == .13
     assert by_sid["engineered_features"] == [

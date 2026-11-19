@@ -119,13 +119,28 @@ Provider-specific variables such as `OPENAI_API_KEY`, `OPENAI_MODEL`,
    `stratum_label_quality`, `stratum_join_check`, and `stratum_schema_check`.
 4. Use `stratum_next_action`, `stratum_decisions`, `stratum_create_decision`, and
    `stratum_resolve_decision` when the agent needs user judgement.
-5. Split data with `stratum_split`, then check contamination with
-   `stratum_contamination`.
-6. Train with `stratum_train`, validate with `stratum_validate`, and investigate
-   weak areas with `stratum_segments` and `stratum_stability`.
+5. Choose a split with `stratum_split` (`random`, `stratified`, `group`,
+   `temporal`, or `predefined`; temporal splits also support a row gap), then
+   check contamination with `stratum_contamination`. Group splits keep groups
+   disjoint and exclude the group column from model features. Predefined splits
+   use a train/test assignment column and remove it from the saved partitions.
+6. Pass the returned `split_id` and `sid` to `stratum_train` to train and
+   evaluate on those exact saved partitions. Each split has unique persisted
+   files and a manifest with source and partition checksums, so later splits do
+   not invalidate earlier split IDs. Training without a `split_id` retains a
+   deterministic internal holdout and records its strategy. Tuning from group
+   and temporal splits uses GroupKFold and TimeSeriesSplit respectively;
+   predefined splits reject exact row-value overlap across partitions. Validate with
+   `stratum_validate` and investigate weak areas with `stratum_segments` and
+   `stratum_stability`.
 7. Score new data with `stratum_predict`, monitor drift with
    `stratum_drift_current`, compare runs with `stratum_compare`, export with
    `stratum_export`, and summarize the trail with `stratum_report`.
+
+Blocking decisions must declare `safe_answers`. A recommendation is not a user
+decision: only an answer explicitly listed as safe clears the workflow gate.
+Unknown, deferred, and unsafe answers remain visible and keep training,
+prediction, and export blocked until the decision is safely resolved.
 
 ## MCP Tool Map
 

@@ -53,3 +53,73 @@ def test_catboost_uses_core_encoder_for_categorical_data():
     )
     assert [name for name, _ in result.estimator.steps][:2] == ["imputer", "encoder"]
     assert len(result.predict(X)) == len(X)
+
+
+def test_train_routes_custom_cv_splitter_and_groups(monkeypatch):
+    from sklearn.model_selection import GroupKFold
+    import MLProj.api as api
+
+    class Wrapper:
+        def __init__(self):
+            self.opt_crossval = False
+
+        def optimize(self, X, y, **kwargs):
+            self.optimized = True
+
+        def get_best_model(self):
+            return object()
+
+        def get_best_params(self):
+            return {}
+
+        def get_study(self):
+            return None
+
+        def feature_names(self):
+            return []
+
+    wrapper = Wrapper()
+    def build_model(*args, **kwargs):
+        wrapper.opt_crossval = kwargs["crossval"]
+        return wrapper
+
+    monkeypatch.setattr(api, "create_model", build_model)
+    groups = np.repeat(np.arange(4), 3)
+    splitter = GroupKFold(n_splits=4)
+
+    result = api.train(
+        "classification", "logistic_regression", pd.DataFrame({"x": range(12)}),
+        pd.Series([0, 1] * 6), tune=True, n_trials=1, cv_splitter=splitter,
+        cv_groups=groups, crossval=False,
+    )
+
+    assert wrapper.opt_crossval is True
+    assert wrapper.cv is splitter
+    assert np.array_equal(wrapper.cv_groups, groups)
+    assert result.metadata["crossval"] is True
+
+
+def test_model_cv_passes_group_labels_to_sklearn(monkeypatch):
+    from sklearn.model_selection import GroupKFold
+    import MLProj.base_model as base_model
+    from MLProj.statistical.logreg import LogRegModel
+
+    groups = np.repeat(np.arange(4), 3)
+    splitter = GroupKFold(n_splits=4)
+    wrapper = LogRegModel(mode="Classifier", crossval=True)
+    wrapper.cv = splitter
+    wrapper.cv_groups = groups
+    wrapper.set_loss_function("accuracy")
+    observed = {}
+
+    def score(model, X, y, **kwargs):
+        observed.update(kwargs)
+        return np.array([0.5])
+
+    monkeypatch.setattr(base_model, "cross_val_score", score)
+    X = pd.DataFrame({"x": range(12)})
+    y = pd.Series([0, 1] * 6)
+
+    assert wrapper._cpu_cross_val_score(X, y, {}, splitter) == 0.5
+    assert observed["cv"] is splitter
+    assert np.array_equal(observed["groups"], groups)

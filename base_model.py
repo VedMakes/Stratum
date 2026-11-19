@@ -292,6 +292,7 @@ class BaseModel(ABC):
         self.train_X = None
         self.train_y = None
         self.param_search_space = {}
+        self.cv_groups = None
 
         self._model = None
         self._params = {}
@@ -755,7 +756,9 @@ class BaseModel(ABC):
 
     def _cpu_cross_val_score(self, X, y, params, cv_splits):
         model = self._build_model(params, use_cuda=False)
-        if self._mode == "Classifier":
+        if hasattr(cv_splits, "split"):
+            cv_strategy = cv_splits
+        elif self._mode == "Classifier":
             cv_strategy = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=42)
         else:
             cv_strategy = KFold(n_splits=cv_splits, shuffle=True, random_state=42)
@@ -765,6 +768,7 @@ class BaseModel(ABC):
             X,
             y,
             cv=cv_strategy,
+            groups=self.cv_groups,
             scoring=self._score_spec.cv_scorer,
             n_jobs=self.n_jobs,
             error_score="raise",

@@ -11,6 +11,7 @@ from ..session import (
     get_session,
     get_session_by_file,
     get_session_runs,
+    get_workflow_blockers,
 )
 
 
@@ -88,6 +89,8 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
             "metric": metric,
             "score": value,
             "date": run["created_at"],
+            "split_id": (run.get("split_metadata") or {}).get("split_id"),
+            "split_strategy": (run.get("split_metadata") or {}).get("strategy"),
         }
         if metric:
             compact[metric] = value
@@ -100,6 +103,7 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
         "best_model": best["model_id"] if best else None,
         "resolved_flags": get_resolved_flags(sid),
         "pending_decisions": get_decisions(sid, status="pending"),
+        "blocking_decisions": get_workflow_blockers(sid),
         "recent_journal": get_journal(sid, limit=10),
         "engineered_features": _engineered_features(artifacts),
         "current_metric": best_metric,

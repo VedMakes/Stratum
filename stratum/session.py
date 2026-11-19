@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS runs (
     decision_tree_summary TEXT, optuna_top5 TEXT, created_at TEXT,
     dataset_path TEXT, target_col TEXT, feature_names TEXT,
     feature_dtypes TEXT, preprocessing TEXT, metric_direction TEXT,
-    artifact_path TEXT, training_policy TEXT
+    artifact_path TEXT, training_policy TEXT, split_metadata TEXT
 );"""
 CREATE_ARTIFACTS = """
 CREATE TABLE IF NOT EXISTS artifacts (
@@ -41,7 +41,7 @@ CREATE_DECISIONS = """
 CREATE TABLE IF NOT EXISTS decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT, sid TEXT, decision_id TEXT UNIQUE,
     decision_type TEXT, column_name TEXT, question TEXT, why_it_matters TEXT,
-    options TEXT, recommended TEXT, blocking INTEGER DEFAULT 0,
+    options TEXT, safe_answers TEXT DEFAULT '[]', recommended TEXT, blocking INTEGER DEFAULT 0,
     status TEXT DEFAULT 'pending', answer TEXT, user_comment TEXT,
     source TEXT, created_at TEXT, resolved_at TEXT
 );"""
@@ -60,7 +60,28 @@ RUN_COLUMNS = {
     "metric_direction": "TEXT",
     "artifact_path": "TEXT",
     "training_policy": "TEXT",
+    "split_metadata": "TEXT",
 }
+UNSAFE_DECISION_ANSWERS = {"unknown", "deferred", "reject", "rejected"}
+
+
+def _answer_is_safe(answer: str | None, safe_answers: list[str]) -> bool:
+    if answer is None or answer not in safe_answers:
+        return False
+    return answer.strip().casefold() not in UNSAFE_DECISION_ANSWERS
+
+
+def _resolution_state(status: str, answer: str | None, safe_answers: list[str]) -> str:
+    if status != "resolved":
+        return "pending" if status == "pending" else "invalidated"
+    if _answer_is_safe(answer, safe_answers):
+        return "confirmed"
+    normalized = (answer or "").strip().casefold()
+    if normalized in {"unknown", "deferred"}:
+        return normalized
+    if normalized in {"reject", "rejected"}:
+        return "rejected"
+    return "unsafe"
 
 
 def _now() -> str:
@@ -91,6 +112,9 @@ def _initialize(conn: sqlite3.Connection) -> None:
     for name, sql_type in RUN_COLUMNS.items():
         if name not in existing:
             conn.execute(f"ALTER TABLE runs ADD COLUMN {name} {sql_type}")
+    decision_columns = {row[1] for row in conn.execute("PRAGMA table_info(decisions)")}
+    if "safe_answers" not in decision_columns:
+        conn.execute("ALTER TABLE decisions ADD COLUMN safe_answers TEXT DEFAULT '[]'")
     conn.commit()
 
 
@@ -206,10 +230,11 @@ def save_run(
         "metric_direction": metadata.get("metric_direction", "maximize"),
         "artifact_path": metadata.get("artifact_path", ""),
         "training_policy": metadata.get("training_policy", {}),
+        "split_metadata": metadata.get("split_metadata", {}),
     }
     json_fields = {
         "best_params", "metrics", "top_features", "optuna_top5", "feature_names",
-        "feature_dtypes", "preprocessing", "training_policy"
+        "feature_dtypes", "preprocessing", "training_policy", "split_metadata"
     }
     values = [json.dumps(json_safe(payload[k])) if k in json_fields else payload[k] for k in payload]
     with _connect(db_path) as conn:
@@ -225,7 +250,7 @@ def _decode_run(row: sqlite3.Row | None) -> dict | None:
     result = dict(row)
     for key in (
         "best_params", "metrics", "top_features", "optuna_top5", "feature_names",
-        "feature_dtypes", "preprocessing", "training_policy"
+        "feature_dtypes", "preprocessing", "training_policy", "split_metadata"
     ):
         try:
             result[key] = json.loads(result.get(key) or "null")
@@ -343,28 +368,52 @@ def create_decision(
     *,
     column: str | None = None,
     options: list[str] | None = None,
+    safe_answers: list[str] | None = None,
     recommended: str | None = None,
     blocking: bool = False,
     source: str = "",
     db_path: str | Path | None = None,
 ) -> str:
     options = options or ["approve", "reject", "unknown"]
+    if blocking and not safe_answers:
+        raise ValueError("Blocking decisions require at least one explicit safe_answer.")
+    safe_answers = safe_answers or []
+    invalid_safe_answers = [answer for answer in safe_answers if answer not in options]
+    if invalid_safe_answers:
+        raise ValueError(f"safe_answers must be selected from options: {options}")
+    unsafe_answers = [
+        answer for answer in safe_answers
+        if answer.strip().casefold() in UNSAFE_DECISION_ANSWERS
+    ]
+    if unsafe_answers:
+        raise ValueError("unknown, deferred, and rejected answers cannot be declared safe")
     with _connect(db_path) as conn:
         existing = conn.execute(
-            """SELECT decision_id FROM decisions
+            """SELECT decision_id, options, safe_answers FROM decisions
                WHERE sid=? AND decision_type=? AND COALESCE(column_name, '')=?
                AND status='pending'""",
             (sid, decision_type, column or ""),
         ).fetchone()
         if existing:
+            existing_options = json.loads(existing["options"] or "[]")
+            stored_safe_answers = json.loads(existing["safe_answers"] or "[]")
+            if blocking and not stored_safe_answers:
+                if any(answer not in existing_options for answer in safe_answers):
+                    raise ValueError(
+                        f"safe_answers must be selected from existing options: {existing_options}"
+                    )
+                conn.execute(
+                    "UPDATE decisions SET safe_answers=? WHERE decision_id=?",
+                    (json.dumps(json_safe(safe_answers)), existing["decision_id"]),
+                )
             return str(existing["decision_id"])
         decision_id = f"dec_{uuid.uuid4().hex[:10]}"
         conn.execute(
             """INSERT INTO decisions
                (sid, decision_id, decision_type, column_name, question,
-                why_it_matters, options, recommended, blocking, status,
+                why_it_matters, options, safe_answers, recommended, blocking, status,
                 answer, user_comment, source, created_at, resolved_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 sid,
                 decision_id,
@@ -373,6 +422,7 @@ def create_decision(
                 str(question)[:500],
                 str(why_it_matters)[:1000],
                 json.dumps(json_safe(options)),
+                json.dumps(json_safe(safe_answers)),
                 recommended,
                 int(bool(blocking)),
                 "pending",
@@ -411,9 +461,26 @@ def get_decisions(
     for row in rows:
         item = dict(row)
         item["options"] = json.loads(item["options"] or "[]")
+        item["safe_answers"] = json.loads(item.get("safe_answers") or "[]")
         item["blocking"] = bool(item["blocking"])
+        item["resolution_state"] = _resolution_state(
+            item["status"], item.get("answer"), item["safe_answers"]
+        )
+        item["safe_to_proceed"] = (
+            not item["blocking"] or item["resolution_state"] == "confirmed"
+        )
         result.append(item)
     return result
+
+
+def get_workflow_blockers(sid: str, db_path: str | Path | None = None) -> list[dict]:
+    """Return blocking decisions that have not been resolved with a safe answer."""
+    return [
+        decision
+        for decision in get_decisions(sid, status=None, db_path=db_path)
+        if decision["blocking"]
+        and not decision["safe_to_proceed"]
+    ]
 
 
 def resolve_decision(
@@ -429,6 +496,7 @@ def resolve_decision(
         if not row:
             return None
         options = json.loads(row["options"] or "[]")
+        safe_answers = json.loads(row["safe_answers"] or "[]")
         if options and answer not in options:
             raise ValueError(f"answer must be one of: {options}")
         conn.execute(
@@ -439,16 +507,24 @@ def resolve_decision(
         )
     item = dict(row)
     item["options"] = options
+    item["safe_answers"] = safe_answers
     item["blocking"] = bool(item["blocking"])
     item["status"] = "resolved"
     item["answer"] = answer
     item["user_comment"] = comment
+    item["resolution_state"] = _resolution_state("resolved", answer, safe_answers)
+    item["safe_to_proceed"] = not item["blocking"] or item["resolution_state"] == "confirmed"
     log_event(
         item["sid"],
         "user",
         "decision_resolved",
         f"Resolved decision {decision_id}: {answer}",
-        {"decision_id": decision_id, "answer": answer, "comment": comment},
+        {
+            "decision_id": decision_id,
+            "answer": answer,
+            "comment": comment,
+            "safe_to_proceed": item["safe_to_proceed"],
+        },
         db_path=db_path,
     )
     return item

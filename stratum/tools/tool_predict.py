@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from ..common import json_safe, load_csv
-from ..session import get_run, save_artifact
+from ..session import get_run, get_workflow_blockers, save_artifact
 
 
 def _confidence(estimator, X: pd.DataFrame, predictions: np.ndarray) -> list[float | None]:
@@ -38,6 +38,14 @@ def run_predict(
         return {"error": f"Model '{model_id}' not found. Run stratum_train first."}
     if sid and sid != run["sid"]:
         return {"error": f"Model '{model_id}' does not belong to session '{sid}'."}
+    blockers = get_workflow_blockers(run["sid"])
+    if blockers:
+        return {
+            "error": "Prediction is blocked by unresolved domain decisions.",
+            "sid": run["sid"],
+            "recommended_action": "ask_user",
+            "blocked_decisions": blockers,
+        }
     if not run.get("artifact_path"):
         return {"error": f"Model '{model_id}' has no fitted artifact path."}
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from stratum.session import create_session, save_run
+from stratum.session import create_decision, create_session, save_run
 from stratum.tools.tool_compare import run_compare
 from stratum.tools.tool_export import run_export
 
@@ -46,3 +46,22 @@ def test_compare_and_export(tmp_path):
     model_path = tmp_path / "retrained.joblib"
     module.main(str(data), str(model_path))
     assert model_path.exists()
+
+
+def test_export_is_blocked_by_unresolved_domain_decision(tmp_path):
+    sid = create_session("/tmp/data.csv", "target")
+    _save(sid, "blocked_export", .8)
+    create_decision(
+        sid,
+        "temporal_availability",
+        "Was the date available before prediction?",
+        "Post-outcome values can leak the target.",
+        options=["available_before_prediction", "post_outcome", "unknown"],
+        safe_answers=["available_before_prediction"],
+        blocking=True,
+    )
+
+    result = run_export("blocked_export")
+
+    assert result["recommended_action"] == "ask_user"
+    assert result["blocked_decisions"]

@@ -7,6 +7,7 @@ from ..session import (
     get_journal,
     get_session,
     get_session_by_file,
+    get_workflow_blockers,
     log_event,
     resolve_decision,
 )
@@ -29,30 +30,35 @@ def run_create_decision(
     why_it_matters: str,
     column: str | None = None,
     options: list[str] | None = None,
+    safe_answers: list[str] | None = None,
     recommended: str | None = None,
     blocking: bool = False,
     source: str = "agent",
 ) -> dict:
     if not get_session(sid):
         return {"error": f"Session '{sid}' not found."}
-    decision_id = create_decision(
-        sid,
-        decision_type,
-        question,
-        why_it_matters,
-        column=column,
-        options=options,
-        recommended=recommended,
-        blocking=blocking,
-        source=source,
-    )
+    try:
+        decision_id = create_decision(
+            sid,
+            decision_type,
+            question,
+            why_it_matters,
+            column=column,
+            options=options,
+            safe_answers=safe_answers,
+            recommended=recommended,
+            blocking=blocking,
+            source=source,
+        )
+    except ValueError as exc:
+        return {"error": str(exc)}
     return json_safe({"sid": sid, "decision_id": decision_id})
 
 
 def run_decisions(
     sid: str | None = None,
     file: str | None = None,
-    status: str | None = "pending",
+    status: str | None = None,
 ) -> dict:
     resolved_sid, error = _resolve_sid(sid, file)
     if error:
@@ -109,12 +115,12 @@ def run_next_action(sid: str | None = None, file: str | None = None) -> dict:
     if error:
         return error
     decisions = get_decisions(resolved_sid, status="pending")
-    blocking = [item for item in decisions if item["blocking"]]
+    blocking = get_workflow_blockers(resolved_sid)
     if blocking:
         return json_safe({
             "sid": resolved_sid,
             "recommended_action": "ask_user",
-            "reason": f"{len(blocking)} blocking decision(s) require domain input.",
+            "reason": f"{len(blocking)} blocking decision(s) lack a safe resolution.",
             "decisions": blocking,
             "safe_actions": ["profile", "schema_check", "label_quality", "report"],
             "blocked_actions": ["train", "export", "predict"],

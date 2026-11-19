@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..session import get_run, save_artifact
+from ..session import get_run, get_workflow_blockers, save_artifact
 
 
 def _script(run: dict) -> str:
@@ -51,6 +51,14 @@ def run_export(model_id: str, output_path: str | None = None, sid: str | None = 
         return {"error": f"Model '{model_id}' not found. Run stratum_train first."}
     if sid and sid != run["sid"]:
         return {"error": f"Model '{model_id}' does not belong to session '{sid}'."}
+    blockers = get_workflow_blockers(run["sid"])
+    if blockers:
+        return {
+            "error": "Export is blocked by unresolved domain decisions.",
+            "sid": run["sid"],
+            "recommended_action": "ask_user",
+            "blocked_decisions": blockers,
+        }
     try:
         code = _script(run)
     except Exception as exc:

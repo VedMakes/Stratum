@@ -56,6 +56,7 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
         "runs": status["runs"],
         "resolved_flags": status["resolved_flags"],
         "pending_decisions": status.get("pending_decisions", []),
+        "blocking_decisions": status.get("blocking_decisions", []),
         "recent_journal": status.get("recent_journal", []),
         "engineered_features": status["engineered_features"],
         "diagnostics": diagnostics,

@@ -36,6 +36,8 @@ def train(
     n_trials=None,
     timeout=None,
     crossval=None,
+    cv_splitter=None,
+    cv_groups=None,
     fit_best=True,
     **model_kwargs,
 ):
@@ -44,14 +46,24 @@ def train(
 
     if isinstance(model, str):
         model_name = normalize_model_name(model)
-        if "crossval" not in model_kwargs and (tune or crossval is not None):
-            model_kwargs["crossval"] = preset_config["crossval"] if crossval is None else crossval
+        if "crossval" not in model_kwargs and (tune or crossval is not None or cv_splitter is not None):
+            model_kwargs["crossval"] = (
+                True if cv_splitter is not None
+                else preset_config["crossval"] if crossval is None else crossval
+            )
         wrapper = create_model(model_name, normalized_task, **model_kwargs)
     else:
         model_name = model.__class__.__name__
         wrapper = model
         if tune and crossval is not None:
             wrapper.opt_crossval = crossval
+
+    if cv_splitter is not None:
+        if not tune:
+            raise ValueError("cv_splitter requires tune=True")
+        wrapper.opt_crossval = True
+        wrapper.cv = cv_splitter
+        wrapper.cv_groups = cv_groups
 
     if metric is not None:
         wrapper.set_loss_function(metric, direction=metric_direction, response=metric_response)

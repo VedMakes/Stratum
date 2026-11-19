@@ -38,6 +38,7 @@ ENV/
 *.pem
 .agents
 .codex
+Stratum_Engineering_Roadmap_Agent_Guideline.docx
 
 # IDE and editor state
 .idea/
@@ -56,7 +57,7 @@ desktop.ini
 *.ipynb_checkpoints/
 
 # Data, model artifacts, and experiment output
-data/
+/data/
 datasets/
 artifacts/
 outputs/

@@ -4,6 +4,7 @@ import pandas as pd
 from stratum.data.drift import compute_psi, run_drift
 from stratum.data.profiler import run_profile
 from stratum.data.splitter import run_split
+from stratum.session import get_artifacts
 
 
 def test_profile(binary_csv):
@@ -44,6 +45,94 @@ def test_split_modes(binary_csv, tmp_path):
     train = pd.read_csv(temporal["train_path"])
     test = pd.read_csv(temporal["test_path"])
     assert pd.to_datetime(test["when"]).min() >= pd.to_datetime(train["when"]).max()
+    assert temporal["split_id"]
+
+
+def test_group_split_keeps_groups_disjoint_and_persists_manifest(tmp_path):
+    df = pd.DataFrame({
+        "entity": [f"g{i}" for i in range(12) for _ in range(5)],
+        "feature": range(60),
+        "target": [0, 1, 0, 1, 0] * 12,
+    })
+    path = tmp_path / "groups.csv"
+    df.to_csv(path, index=False)
+
+    result = run_split(str(path), "target", mode="group", group_col="entity", seed=7)
+
+    train, test = pd.read_csv(result["train_path"]), pd.read_csv(result["test_path"])
+    assert set(train["entity"]).isdisjoint(test["entity"])
+    assert result["excluded_feature"] == "entity"
+    manifest = next(
+        artifact for artifact in get_artifacts(result["sid"], "split_manifest")
+        if artifact["metadata"]["split_id"] == result["split_id"]
+    )
+    assert manifest["metadata"]["parameters"]["seed"] == 7
+    assert manifest["metadata"]["train_row_fingerprint"]
+
+
+def test_predefined_split_uses_and_removes_assignment_column(tmp_path):
+    df = pd.DataFrame({
+        "feature": range(10),
+        "partition": ["train"] * 7 + ["test"] * 3,
+        "target": [0, 1] * 5,
+    })
+    path = tmp_path / "predefined.csv"
+    df.to_csv(path, index=False)
+
+    result = run_split(
+        str(path), "target", mode="predefined", split_col="partition", test_size=1.5
+    )
+
+    train, test = pd.read_csv(result["train_path"]), pd.read_csv(result["test_path"])
+    assert len(train) == 7 and len(test) == 3
+    assert "partition" not in train and "partition" not in test
+    assert result["parameters"]["train_value"] == "train"
+
+
+def test_predefined_split_rejects_duplicate_rows_across_partitions(tmp_path):
+    path = tmp_path / "overlap.csv"
+    pd.DataFrame({
+        "feature": [1, 1, 2, 3],
+        "partition": ["train", "test", "train", "test"],
+        "target": [0, 0, 1, 1],
+    }).to_csv(path, index=False)
+
+    result = run_split(str(path), "target", mode="predefined", split_col="partition")
+
+    assert result["error"] == "Predefined partitions contain 1 identical row value(s) across train and test."
+
+
+def test_repeated_splits_keep_prior_artifacts_usable(binary_csv):
+    from stratum.tools.tool_train import _load_saved_split
+
+    first = run_split(str(binary_csv), "target", mode="stratified", seed=1)
+    second = run_split(str(binary_csv), "target", mode="stratified", seed=2)
+
+    assert first["train_path"] != second["train_path"]
+    assert first["test_path"] != second["test_path"]
+    train_df, test_df, manifest, error = _load_saved_split(
+        str(binary_csv), "target", first["sid"], first["split_id"]
+    )
+    assert error is None
+    assert len(train_df) == manifest["train_rows"]
+    assert len(test_df) == manifest["test_rows"]
+
+
+def test_temporal_gap_rows_are_excluded_between_partitions(tmp_path):
+    df = pd.DataFrame({
+        "when": pd.date_range("2025-01-01", periods=20).astype(str),
+        "row_id": range(20),
+        "target": [0, 1] * 10,
+    })
+    path = tmp_path / "temporal_gap.csv"
+    df.to_csv(path, index=False)
+
+    result = run_split(str(path), "target", mode="temporal", time_col="when", gap_rows=2)
+
+    train, test = pd.read_csv(result["train_path"]), pd.read_csv(result["test_path"])
+    assert train["row_id"].max() == 13
+    assert test["row_id"].min() == 16
+    assert result["parameters"]["gap_rows"] == 2
 
 
 def test_stratified_split_warns_on_disguised_datetime(binary_csv, tmp_path):
