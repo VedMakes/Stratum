@@ -19,6 +19,15 @@ def _primary_metric(run: dict) -> tuple[str | None, float | None, str]:
     metrics = run.get("metrics") or {}
     if not metrics:
         return None, None, run.get("metric_direction") or "maximize"
+    selection = (run.get("training_policy") or {}).get("selection") or {}
+    selected = selection.get("metric")
+    selected_key = {"f1": "f1_weighted"}.get(selected, selected)
+    if selected_key in metrics:
+        return (
+            selected_key,
+            float(metrics[selected_key]),
+            selection.get("direction") or run.get("metric_direction") or "maximize",
+        )
     if run.get("task") == "regression":
         for name in ("rmse", "mae", "mse", "r2"):
             if name in metrics:
@@ -36,10 +45,21 @@ def _best_run(runs: list[dict]) -> dict | None:
     for run in runs:
         metric, value, direction = _primary_metric(run)
         if metric is not None and value is not None:
-            scored.append((run, value, direction))
+            scored.append((run, metric, value, direction))
     if not scored:
         return runs[-1] if runs else None
-    return sorted(scored, key=lambda item: item[1], reverse=scored[0][2] == "maximize")[0][0]
+    latest_metric, _, latest_direction = _primary_metric(scored[-1][0])
+    current_objective = (latest_metric, latest_direction)
+    comparable = [
+        (run, value, direction)
+        for run, metric, value, direction in scored
+        if (metric, direction) == current_objective
+    ]
+    if not comparable:
+        comparable = [(scored[-1][0], scored[-1][2], scored[-1][3])]
+    return sorted(
+        comparable, key=lambda item: item[1], reverse=current_objective[1] == "maximize"
+    )[0][0]
 
 
 def _engineered_features(artifacts: list[dict]) -> list[str]:

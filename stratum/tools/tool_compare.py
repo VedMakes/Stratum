@@ -7,6 +7,15 @@ from ..session import get_artifacts, get_run
 
 def _primary(run: dict) -> tuple[str, float, str]:
     metrics = run["metrics"]
+    selection = (run.get("training_policy") or {}).get("selection") or {}
+    selected = selection.get("metric")
+    selected_key = {"f1": "f1_weighted"}.get(selected, selected)
+    if selected_key in metrics:
+        return (
+            selected_key,
+            float(metrics[selected_key]),
+            selection.get("direction") or run.get("metric_direction") or "maximize",
+        )
     if run["task"] == "regression":
         name = "rmse" if "rmse" in metrics else next(iter(metrics))
         return name, float(metrics[name]), "minimize"

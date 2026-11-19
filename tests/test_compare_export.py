@@ -56,6 +56,25 @@ def test_compare_and_export(tmp_path):
     assert model_path.exists()
 
 
+def test_compare_honors_persisted_selection_metric():
+    sid = create_session("/tmp/selected-metric.csv", "target")
+    save_run(sid, "accuracy_choice", Result(), {"accuracy": .9, "f1_weighted": .4}, metadata={
+        "model_name": "random_forest", "task": "classification",
+        "training_policy": {"selection": {"metric": "accuracy", "direction": "maximize"}},
+        "top_features": [], "best_params": {},
+    })
+    save_run(sid, "f1_choice", Result(), {"accuracy": .7, "f1_weighted": .8}, metadata={
+        "model_name": "random_forest", "task": "classification",
+        "training_policy": {"selection": {"metric": "accuracy", "direction": "maximize"}},
+        "top_features": [], "best_params": {},
+    })
+
+    comparison = run_compare("accuracy_choice", "f1_choice")
+
+    assert comparison["winner"] == "a"
+    assert "accuracy" in comparison["narrative"]
+
+
 def test_export_is_blocked_by_unresolved_domain_decision(tmp_path):
     sid = create_session("/tmp/data.csv", "target")
     _save(sid, "blocked_export", .8)

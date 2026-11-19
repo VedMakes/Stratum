@@ -11,7 +11,7 @@ from stratum.session import (
     save_run,
 )
 from stratum.tools.tool_predict import run_predict
-from stratum.tools.tool_status import run_status
+from stratum.tools.tool_status import _best_run, _primary_metric, run_status
 
 
 class TinyClassifier:
@@ -29,6 +29,22 @@ class Result:
     model_name = "tiny"
     task = "classification"
     best_params = {}
+
+
+def test_status_ranks_runs_by_latest_saved_selection_objective():
+    accuracy_run = {
+        "metrics": {"accuracy": .95, "f1_weighted": .4},
+        "task": "classification",
+        "training_policy": {"selection": {"metric": "accuracy", "direction": "maximize"}},
+    }
+    f1_run = {
+        "metrics": {"accuracy": .7, "f1_weighted": .8},
+        "task": "classification",
+        "training_policy": {"selection": {"metric": "f1", "direction": "maximize"}},
+    }
+
+    assert _primary_metric(f1_run) == ("f1_weighted", .8, "maximize")
+    assert _best_run([accuracy_run, f1_run]) is f1_run
 
 
 def _save_model_run(tmp_path, sid, model_id, accuracy):
