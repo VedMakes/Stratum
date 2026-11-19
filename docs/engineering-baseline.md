@@ -163,6 +163,18 @@ Milestone 1 resampling fix is implemented:
 - Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
   **75 passed** in 5.06 seconds.
 
-Next linear task: add end-to-end agent workflow tests, including direct bypass
-attempts, as specified in Milestone 1.
+Milestone 1 end-to-end workflow coverage is implemented:
+
+- A single MCP-dispatch test covers profile/status, split persistence, an
+  unresolved target decision, an `unknown` answer that remains blocking, safe
+  resolution, exact-split training, validation, segment analysis, a second
+  decision, and direct train/predict/export bypass attempts.
+- The second blocker prevents all three operations and prevents prediction or
+  export files from being written. After safe resolution, prediction, export,
+  status, and report all reflect the completed workflow.
+- Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
+  **76 passed** in 5.48 seconds.
+
+Next linear task: Milestone 2 methodological evaluation, beginning with
+task-appropriate baseline comparisons and metrics.
 
