@@ -148,7 +148,10 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
    the same holdout, and returns per-class scores, probability metrics when
    supported, and evaluation warnings. Validate with
    `stratum_validate` and investigate weak areas with `stratum_segments` and
-   `stratum_stability`.
+   `stratum_stability`. Stability evaluation reuses the saved split design:
+   repeated stratified/group folds for IID/group data, or ordered walk-forward
+   folds with the saved gap for temporal data. Predefined partitions are not
+   randomly re-split.
 7. Score new data with `stratum_predict`, monitor drift with
    `stratum_drift_current`, compare runs with `stratum_compare`, export with
    `stratum_export`, and summarize the trail with `stratum_report`.

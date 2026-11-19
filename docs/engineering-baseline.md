@@ -192,6 +192,23 @@ Milestone 2 baseline comparison and task metrics are implemented:
 - Full-suite verification: `.venv/bin/python -m pytest -q` passed:
   **79 passed** in 5.88 seconds.
 
-Next linear task: add repeated or uncertainty-aware evaluation and ensure its
-protocol is saved and reproducible, as specified in Milestone 2.
+Milestone 2 split-aware uncertainty evaluation is implemented:
+
+- IID runs use repeated stratified or ordinary K-fold. Group runs use repeated
+  shuffled `GroupKFold` with the persisted group column and are checked for
+  group disjointness. Temporal runs use ordered `TimeSeriesSplit` with the
+  persisted row gap; repeats are not misrepresented as independent temporal
+  experiments. Predefined runs are directed to validation on their designated
+  test partition instead of being randomly re-split.
+- Results persist the method, folds/repeats, seed, metric, time/group parameters,
+  source SHA256, data fingerprint, fold scores, repeat means, standard
+  deviation, and descriptive 90% score range. The response explicitly warns
+  that overlapping CV folds do not form independent confidence intervals.
+- The MCP schema exposes repeat and seed controls; reports include the saved
+  stability artifact protocol.
+- Full-suite verification: `.venv/bin/python -m pytest -q` passed:
+  **84 passed** in 4.50 seconds.
+
+Next linear task: add group-wise and subgroup evaluation reporting, scoped to
+the declared evaluation data and with support thresholds made explicit.
 

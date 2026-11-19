@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from stratum.session import create_session, save_run
+from stratum.session import create_session, get_artifacts, save_run
 from stratum.tools.tool_report import run_report
 from stratum.tools.tool_segments import run_segments
 from stratum.tools.tool_stability import run_stability
@@ -99,12 +99,131 @@ def test_stability_reports_fold_variance(tmp_path):
     data = tmp_path / "stable.csv"
     _training_frame(60).to_csv(data, index=False)
 
-    result = run_stability(model_id, str(data), sid=sid, folds=4)
+    result = run_stability(model_id, str(data), sid=sid, folds=4, repeats=1)
 
     assert result["folds"] == 4
     assert result["metric"] == "f1_weighted"
     assert len(result["fold_scores"]) == 4
     assert result["stability"] in {"stable", "moderate", "unstable"}
+    assert result["protocol"]["method"] == "repeated_stratified_kfold"
+    assert result["protocol"]["source_sha256"]
+    artifact = [item for item in get_artifacts(sid, "stability")][-1]
+    assert artifact["metadata"]["protocol"] == result["protocol"]
+
+
+def test_stability_repeats_iid_cv_and_reports_descriptive_spread(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    data = tmp_path / "repeated.csv"
+    _training_frame(60).to_csv(data, index=False)
+
+    result = run_stability(model_id, str(data), sid=sid, folds=3, repeats=4, seed=9)
+
+    assert result["repeats"] == 4
+    assert len(result["fold_scores"]) == 12
+    assert len(result["repeat_scores"]) == 4
+    assert len(result["score_range_90pct"]) == 2
+    assert result["protocol"]["seed"] == 9
+    assert any("not independent confidence intervals" in warning for warning in result["warnings"])
+
+
+def test_group_stability_uses_disjoint_groups_in_each_repeat(tmp_path, monkeypatch):
+    from stratum.tools import tool_stability
+
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    save_run(sid, model_id, Result(), {"accuracy": .9}, metadata={
+        "model_name": "logistic_regression", "task": "classification",
+        "feature_names": ["score"], "target_col": "target",
+        "artifact_path": str(tmp_path / f"{model_id}.joblib"),
+        "split_metadata": {"strategy": "group", "parameters": {"group_col": "entity"}},
+    })
+    data = tmp_path / "group_eval.csv"
+    frame = pd.DataFrame({
+        "entity": [f"g{i}" for i in range(12) for _ in range(5)],
+        "score": np.tile(np.linspace(0, 1, 5), 12),
+        "target": [0, 1, 0, 1, 0] * 12,
+    })
+    frame.to_csv(data, index=False)
+    real_score = tool_stability.cross_val_score
+    observed = []
+
+    def checked_score(estimator, X, y, *, cv, groups, **kwargs):
+        fold_rows = list(cv.split(X, y, groups))
+        for train_indices, test_indices in fold_rows:
+            assert set(groups[train_indices]).isdisjoint(groups[test_indices])
+        observed.append(len(fold_rows))
+        return real_score(estimator, X, y, cv=cv, groups=groups, **kwargs)
+
+    monkeypatch.setattr(tool_stability, "cross_val_score", checked_score)
+    result = tool_stability.run_stability(
+        model_id, str(data), sid=sid, folds=4, repeats=3
+    )
+
+    assert "error" not in result
+    assert observed == [4, 4, 4]
+    assert result["protocol"]["method"] == "repeated_group_kfold"
+    assert result["protocol"]["group_col"] == "entity"
+
+
+def test_temporal_stability_preserves_order_and_gap(tmp_path, monkeypatch):
+    from stratum.tools import tool_stability
+
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    save_run(sid, model_id, Result(), {"accuracy": .9}, metadata={
+        "model_name": "logistic_regression", "task": "classification",
+        "feature_names": ["score"], "target_col": "target",
+        "artifact_path": str(tmp_path / f"{model_id}.joblib"),
+        "split_metadata": {
+            "strategy": "temporal",
+            "parameters": {"time_col": "when", "gap_rows": 2},
+        },
+    })
+    data = tmp_path / "temporal_eval.csv"
+    frame = _training_frame(60)
+    frame["target"] = [0, 1] * 30
+    frame["when"] = pd.date_range("2025-01-01", periods=60).astype(str)
+    frame = frame.sample(frac=1, random_state=21)
+    frame.to_csv(data, index=False)
+    real_score = tool_stability.cross_val_score
+    observed = []
+
+    def checked_score(estimator, X, y, *, cv, groups, **kwargs):
+        folds = list(cv.split(X, y))
+        for train_indices, test_indices in folds:
+            assert train_indices.max() + 2 < test_indices.min()
+        observed.append(len(folds))
+        return real_score(estimator, X, y, cv=cv, groups=groups, **kwargs)
+
+    monkeypatch.setattr(tool_stability, "cross_val_score", checked_score)
+    result = tool_stability.run_stability(
+        model_id, str(data), sid=sid, folds=4, repeats=3
+    )
+
+    assert "error" not in result
+    assert observed == [4]
+    assert result["repeats"] == 1
+    assert result["protocol"]["method"] == "time_series"
+    assert result["protocol"]["gap_rows"] == 2
+    assert any("walk-forward schedule" in warning for warning in result["warnings"])
+
+
+def test_predefined_stability_requires_validation_not_resplitting(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    save_run(sid, model_id, Result(), {"accuracy": .9}, metadata={
+        "model_name": "logistic_regression", "task": "classification",
+        "feature_names": ["score"], "target_col": "target",
+        "artifact_path": str(tmp_path / f"{model_id}.joblib"),
+        "split_metadata": {"strategy": "predefined", "parameters": {}},
+    })
+    data = tmp_path / "predefined.csv"
+    _training_frame(60).to_csv(data, index=False)
+
+    result = run_stability(model_id, str(data), sid=sid)
+
+    assert "predefined partition" in result["error"]
 
 
 def test_report_includes_latest_diagnostics(tmp_path):
