@@ -13,7 +13,12 @@ from ..common import load_csv, stratum_home
 from ..core import core_policy, core_train
 from ..data.contracts import build_data_contract
 from ..data.splitter import file_sha256, frame_fingerprint
-from .eval_common import evaluate_predictions
+from .eval_common import (
+    calibration_bins,
+    evaluation_warnings,
+    evaluate_predictions,
+    residual_summary,
+)
 from ..session import (
     ensure_session,
     get_artifacts,
@@ -276,6 +281,27 @@ def run_train(
         )
         metrics = result.evaluate(X_test, y_test)
         evaluation = _baseline_evaluation(selected_task, y_train, y_test, metrics)
+        predictions = np.asarray(result.predict(X_test))
+        if selected_task == "regression":
+            evaluation["residuals"] = residual_summary(y_test, predictions)
+            if evaluation["residuals"]["abs_error_vs_prediction_spearman"] is not None and abs(
+                evaluation["residuals"]["abs_error_vs_prediction_spearman"]
+            ) >= 0.5:
+                evaluation["warnings"].append(
+                    "Absolute error is strongly associated with prediction magnitude; inspect errors across the prediction range."
+                )
+        else:
+            scores = None
+            try:
+                scores = np.asarray(result.predict_proba(X_test))
+            except (AttributeError, NotImplementedError, RuntimeError, ValueError):
+                pass
+            evaluation["calibration_bins"] = calibration_bins(y_test, scores)
+        evaluation["warnings"].extend(
+            warning for warning in evaluation_warnings(
+                selected_task, y_test, metrics, scores if selected_task == "classification" else None
+            ) if warning not in evaluation["warnings"]
+        )
         top_features = result.get_feature_importance(X_test, y_test)[:20]
         tree_summary = _error_summary(result, X_test, y_test, selected_task)
     except Exception as exc:

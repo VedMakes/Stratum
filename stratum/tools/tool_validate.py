@@ -6,6 +6,7 @@ from .eval_common import (
     calibration_bins,
     confusion_summary,
     evaluate_predictions,
+    evaluation_warnings,
     load_labeled_frame,
     load_run_model,
     predict_scores,
@@ -37,9 +38,16 @@ def run_validate(
         "rows_evaluated": len(df),
         "metrics": metrics,
         "target": target or run.get("target_col"),
+        "warnings": evaluation_warnings(run["task"], y, metrics, scores),
     }
     if run["task"] == "regression":
         result["residuals"] = residual_summary(y, predictions)
+        if result["residuals"]["abs_error_vs_prediction_spearman"] is not None and abs(
+            result["residuals"]["abs_error_vs_prediction_spearman"]
+        ) >= 0.5:
+            result["warnings"].append(
+                "Absolute error is strongly associated with prediction magnitude; inspect errors across the prediction range."
+            )
     else:
         result["confusion_matrix"] = confusion_summary(y, predictions)
         result["calibration_bins"] = calibration_bins(y, scores)

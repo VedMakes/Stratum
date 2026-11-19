@@ -10,6 +10,7 @@ from stratum.tools.tool_group_evaluation import run_group_evaluation
 from stratum.tools.tool_stability import run_stability
 from stratum.tools.tool_validate import run_validate
 from stratum.tools.eval_common import classification_metrics
+from stratum.tools.eval_common import evaluation_warnings, residual_summary
 
 
 class Result:
@@ -79,6 +80,25 @@ def test_probability_metrics_support_string_classes():
     assert metrics["positive_class"] == "yes"
     assert metrics["pr_auc"] > .9
     assert metrics["brier_score"] < .1
+
+
+def test_evaluation_warnings_flag_imbalance_and_missing_probabilities():
+    warnings = evaluation_warnings(
+        "classification", [0] * 40 + [1] * 3,
+        {"accuracy": .95}, y_score=None,
+    )
+
+    assert any("highly imbalanced" in warning for warning in warnings)
+    assert any("Probability-based" in warning for warning in warnings)
+
+
+def test_residual_summary_includes_robust_and_tail_diagnostics():
+    summary = residual_summary([1, 2, 3, 4, 100], [1, 2, 3, 4, 5])
+
+    assert summary["median_residual"] == 0
+    assert summary["median_abs_residual"] == 0
+    assert summary["p95_abs_residual"] > summary["p90_abs_residual"]
+    assert summary["robust_outlier_fraction"] == .2
 
 
 def test_segments_finds_bad_group(tmp_path):

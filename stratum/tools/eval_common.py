@@ -144,13 +144,60 @@ def confusion_summary(y_true, y_pred) -> dict:
 def residual_summary(y_true, y_pred) -> dict:
     residuals = np.asarray(y_true, dtype=float) - np.asarray(y_pred, dtype=float)
     abs_residuals = np.abs(residuals)
+    residual_median = float(np.median(residuals))
+    residual_mad = float(np.median(np.abs(residuals - residual_median)))
+    robust_scale = 1.4826 * residual_mad
+    if robust_scale:
+        outlier_fraction = float(np.mean(np.abs(residuals - residual_median) > 3 * robust_scale))
+    else:
+        outlier_fraction = float(np.mean(residuals != residual_median))
+    abs_error_rank_correlation = None
+    if len(residuals) > 1 and np.ptp(y_pred) > 0 and np.ptp(abs_residuals) > 0:
+        correlation = pd.Series(abs_residuals).corr(pd.Series(y_pred), method="spearman")
+        if pd.notna(correlation):
+            abs_error_rank_correlation = float(correlation)
     return {
         "mean_residual": float(np.mean(residuals)),
+        "median_residual": residual_median,
         "mean_abs_residual": float(np.mean(abs_residuals)),
+        "median_abs_residual": float(np.median(abs_residuals)),
+        "residual_mad": residual_mad,
         "p50_abs_residual": float(np.percentile(abs_residuals, 50)),
         "p90_abs_residual": float(np.percentile(abs_residuals, 90)),
+        "p95_abs_residual": float(np.percentile(abs_residuals, 95)),
         "max_abs_residual": float(np.max(abs_residuals)),
+        "robust_outlier_fraction": outlier_fraction,
+        "abs_error_vs_prediction_spearman": abs_error_rank_correlation,
     }
+
+
+def evaluation_warnings(task: str, y_true, metrics: dict, y_score=None) -> list[str]:
+    y = np.asarray(y_true)
+    warnings = []
+    if len(y) < 30:
+        warnings.append(f"Evaluation has only {len(y)} rows; metrics may be highly uncertain.")
+    if task == "regression":
+        if np.ptp(y.astype(float)) == 0:
+            warnings.append("Target is constant in this evaluation data; R-squared is not informative.")
+        elif metrics.get("r2", 0) < 0:
+            warnings.append(
+                "R-squared is negative; predictions perform worse than the evaluation-set target mean baseline."
+            )
+        return warnings
+
+    counts = pd.Series(y).value_counts(dropna=True)
+    if len(counts) < 2:
+        warnings.append("Evaluation contains only one target class; class-separation metrics are unavailable.")
+    elif int(counts.min()) < 5:
+        warnings.append("At least one evaluation class has fewer than 5 rows; per-class metrics are unstable.")
+    if len(counts) > 1 and float(counts.min() / counts.max()) < 0.1:
+        warnings.append(
+            "Target classes are highly imbalanced; accuracy can conceal minority-class errors. "
+            "Inspect balanced accuracy, per-class recall, and PR-AUC."
+        )
+    if y_score is None:
+        warnings.append("Probability-based calibration and Brier diagnostics are unavailable for this estimator.")
+    return warnings
 
 
 def calibration_bins(y_true, y_score, bins: int = 10) -> list[dict]:
