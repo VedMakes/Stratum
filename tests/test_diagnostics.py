@@ -6,6 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from stratum.session import create_session, get_artifacts, save_run
 from stratum.tools.tool_report import run_report
 from stratum.tools.tool_segments import run_segments
+from stratum.tools.tool_group_evaluation import run_group_evaluation
 from stratum.tools.tool_stability import run_stability
 from stratum.tools.tool_validate import run_validate
 from stratum.tools.eval_common import classification_metrics
@@ -91,6 +92,52 @@ def test_segments_finds_bad_group(tmp_path):
     assert result["segments"][0]["column"] == "group"
     assert result["segments"][0]["value"] == "bad"
     assert result["segments"][0]["delta"] > 0
+
+
+def test_group_evaluation_reports_metrics_and_excludes_low_support(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    data = _diagnostic_csv(tmp_path)
+    frame = pd.read_csv(data)
+    frame.loc[:2, "group"] = "rare"
+    frame.to_csv(data, index=False)
+
+    result = run_group_evaluation(model_id, str(data), "group", sid=sid, min_support=10)
+
+    assert result["rows_evaluated"] == 80
+    assert result["overall_metrics"]["accuracy"] < 1
+    assert [group["value"] for group in result["groups"]] == ["bad", "good"]
+    assert result["excluded_groups"] == 1
+    assert result["groups"][0]["metrics"]["accuracy"] < result["groups"][1]["metrics"]["accuracy"]
+    assert "not a fairness" in result["note"]
+    artifact = get_artifacts(sid, "group_evaluation")[-1]
+    assert artifact["metadata"]["min_support"] == 10
+
+
+def test_group_evaluation_counts_missing_values_as_a_group(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    frame = _diagnostic_csv(tmp_path)
+    data = pd.read_csv(frame)
+    data.loc[:19, "group"] = None
+    data.to_csv(frame, index=False)
+
+    result = run_group_evaluation(model_id, str(frame), "group", sid=sid, min_support=10)
+
+    missing_group = next(group for group in result["groups"] if group["value"] == "<missing>")
+    assert missing_group["support"] == 20
+
+
+def test_group_evaluation_validates_group_column_and_support(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    model_id = _save_classifier(tmp_path, sid)
+    data = _diagnostic_csv(tmp_path)
+
+    missing = run_group_evaluation(model_id, str(data), "unknown", sid=sid)
+    support = run_group_evaluation(model_id, str(data), "group", sid=sid, min_support=1)
+
+    assert "not found" in missing["error"]
+    assert "at least 2" in support["error"]
 
 
 def test_stability_reports_fold_variance(tmp_path):
@@ -232,10 +279,13 @@ def test_report_includes_latest_diagnostics(tmp_path):
     data = _diagnostic_csv(tmp_path)
     run_validate(model_id, str(data), sid=sid)
     run_segments(model_id, str(data), sid=sid, min_support=10)
+    run_group_evaluation(model_id, str(data), "group", sid=sid, min_support=10)
     run_stability(model_id, str(data), sid=sid, folds=3)
 
     report = run_report(sid=sid)
 
     assert report["best_model"] == model_id
-    assert set(report["diagnostics"]) >= {"validation", "segment_analysis", "stability"}
+    assert set(report["diagnostics"]) >= {
+        "validation", "segment_analysis", "group_evaluation", "stability"
+    }
     assert "Run stratum_validate" not in " ".join(report["recommended_next_actions"])

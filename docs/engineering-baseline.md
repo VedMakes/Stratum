@@ -209,6 +209,19 @@ Milestone 2 split-aware uncertainty evaluation is implemented:
 - Full-suite verification: `.venv/bin/python -m pytest -q` passed:
   **84 passed** in 4.50 seconds.
 
-Next linear task: add group-wise and subgroup evaluation reporting, scoped to
-the declared evaluation data and with support thresholds made explicit.
+Milestone 2 support-aware subgroup evaluation is implemented:
+
+- `stratum_group_evaluation` reports the shared task metrics overall and for
+  each value of a user-selected column. Missing subgroup values form an
+  explicit group; groups below the configurable support floor are excluded and
+  counted in warnings.
+- The tool stores a `group_evaluation` artifact, appears in session reports,
+  and is registered in the MCP schema and handler map. Its response states that
+  the comparison is descriptive, not a fairness or causal assessment.
+- The focused diagnostics/schema/dispatch tests passed, and full-suite
+  verification with `.venv/bin/python -m pytest -q` passed:
+  **88 passed** in 5.82 seconds.
+
+Next linear task: review the source roadmap and continue with the next
+unimplemented data/ML workflow milestone.
 

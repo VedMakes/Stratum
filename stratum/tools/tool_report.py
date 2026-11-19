@@ -20,7 +20,7 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
         return status
     artifacts = get_artifacts(status["sid"])
     latest = _latest_by_kind(artifacts, {
-        "schema_check", "validation", "segment_analysis", "stability",
+        "schema_check", "validation", "segment_analysis", "group_evaluation", "stability",
         "predictions_csv", "export_script",
     })
     diagnostics = {
@@ -38,6 +38,8 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
         recommended_next_actions.append("Run stratum_validate on a labeled holdout or recent production sample.")
     if "segment_analysis" not in latest and status.get("best_model"):
         recommended_next_actions.append("Run stratum_segments to find where the model fails.")
+    if "group_evaluation" not in latest and status.get("best_model"):
+        recommended_next_actions.append("Run stratum_group_evaluation for a support-aware comparison across a chosen subgroup column.")
     if "stability" not in latest and status.get("best_model"):
         recommended_next_actions.append("Run stratum_stability to estimate fold-to-fold metric variance.")
     if "schema_check" not in latest and status.get("best_model"):

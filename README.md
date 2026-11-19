@@ -147,8 +147,11 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
    compares against a majority-prior classifier or mean-prediction regressor on
    the same holdout, and returns per-class scores, probability metrics when
    supported, and evaluation warnings. Validate with
-   `stratum_validate` and investigate weak areas with `stratum_segments` and
-   `stratum_stability`. Stability evaluation reuses the saved split design:
+   `stratum_validate`, investigate error slices with `stratum_segments`, compare
+   task metrics across a selected column with `stratum_group_evaluation`, and
+   estimate fold spread with `stratum_stability`. Group evaluation reports
+   support thresholds and is descriptive, not a fairness or causal assessment.
+   Stability evaluation reuses the saved split design:
    repeated stratified/group folds for IID/group data, or ordered walk-forward
    folds with the saved gap for temporal data. Predefined partitions are not
    randomly re-split.
@@ -192,6 +195,7 @@ Modelling and analysis tools:
 - `stratum_train`
 - `stratum_validate`
 - `stratum_segments`
+- `stratum_group_evaluation`
 - `stratum_stability`
 - `stratum_predict`
 - `stratum_explain`

@@ -5,7 +5,7 @@ from stratum.schemas import ALL_TOOLS
 
 def test_schemas_are_compressed():
     encoded = json.dumps(ALL_TOOLS)
-    assert len(ALL_TOOLS) == 27
+    assert len(ALL_TOOLS) == 28
     assert len(encoded) / 4 < 8500
 
 
@@ -21,3 +21,9 @@ def test_stability_schema_exposes_reproducible_repeats():
     schema = next(tool for tool in ALL_TOOLS if tool["name"] == "stratum_stability")
     properties = schema["inputSchema"]["properties"]
     assert {"folds", "repeats", "seed", "metric"} <= set(properties)
+
+
+def test_group_evaluation_schema_requires_selected_group_column():
+    schema = next(tool for tool in ALL_TOOLS if tool["name"] == "stratum_group_evaluation")
+    assert schema["inputSchema"]["required"] == ["model_id", "file", "group_col"]
+    assert "min_support" in schema["inputSchema"]["properties"]

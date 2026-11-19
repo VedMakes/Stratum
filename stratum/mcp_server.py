@@ -32,6 +32,7 @@ from .tools.tool_profile import run_profile
 from .tools.tool_report import run_report
 from .tools.tool_schema_check import run_schema_check
 from .tools.tool_segments import run_segments
+from .tools.tool_group_evaluation import run_group_evaluation
 from .tools.tool_split import run_split
 from .tools.tool_stability import run_stability
 from .tools.tool_status import run_status
@@ -60,6 +61,7 @@ HANDLERS = {
     "stratum_train": run_train,
     "stratum_validate": run_validate,
     "stratum_segments": run_segments,
+    "stratum_group_evaluation": run_group_evaluation,
     "stratum_stability": run_stability,
     "stratum_predict": run_predict,
     "stratum_explain": run_explain,
