@@ -82,10 +82,9 @@ regression tests before being described as runtime failures.
 - At the M0 baseline, decision rows had only `pending` and `resolved` statuses;
   resolution only checked membership in options. M1-01 adds a safe-answer
   contract and derived resolution states while preserving stored status values.
-- For targets with at most 20 distinct non-null values,
-  `sanitise_for_api()` includes the raw target category labels in `value_counts`.
-  Column names are redacted when PII-like, but categorical target values are
-  not anonymized there.
+- At the M0 baseline, `sanitise_for_api()` included raw target labels and
+  outbound contexts included data-derived error trees and free-text decision
+  reasoning/comments. M1-03 below minimizes and tests these payloads.
 - In MLProj, `_prepare_training_data()` applies SMOTE before
   `cross_val_score()` creates CV folds. This allows resampled observations to
   be distributed across folds. The same method can prompt through `input()` for
@@ -133,9 +132,24 @@ M1-02 is implemented in the current worktree:
 - Focused split, training, schema, session, and status tests passed. See the
   latest full-suite verification below.
 - Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
-  **68 passed** in 3.74 seconds.
+  **73 passed** in 4.91 seconds.
 
-Next linear task: M1-03, establish and test the privacy boundary for persisted
-session context and any data sent to optional LLM providers, following the
-roadmap.
+M1-03 privacy boundary is implemented in the current worktree:
+
+- Target-class counts sent for feature engineering use anonymous `class_N`
+  labels. Sensitive column names and common email, SSN, UUID, and labeled-ID
+  patterns are redacted from string context.
+- LLM contexts omit raw resolved-flag reasoning/comments and data-derived error
+  trees; prior-run context is limited to aggregate metrics and feature names.
+  Explanation questions receive the same known-pattern redaction.
+- SQLite session database files receive owner-only (`0600`) permissions on POSIX.
+- README documents which minimized fields leave the machine when a provider is
+  configured and warns that heuristic redaction cannot identify every secret.
+- Focused privacy and session permission tests pass; current full-suite result
+  is recorded after final verification.
+- Current working-tree verification: `.venv/bin/python -m pytest -q` passed:
+  **73 passed** in 4.75 seconds.
+
+Next linear task: move resampling inside the cross-validation fold boundary and
+add a regression test for leakage, as specified in Milestone 1.
 

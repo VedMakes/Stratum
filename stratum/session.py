@@ -95,8 +95,14 @@ def _db_path(db_path: str | Path | None = None) -> Path:
 
 def _connect(db_path: str | Path | None = None) -> sqlite3.Connection:
     path = _db_path(db_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     conn = sqlite3.connect(path)
+    if os.name == "posix":
+        try:
+            path.chmod(0o600)
+        except OSError:
+            conn.close()
+            raise
     conn.row_factory = sqlite3.Row
     _initialize(conn)
     return conn

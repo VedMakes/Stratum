@@ -110,6 +110,19 @@ export STRATUM_LLM_API_KEY=your-key
 Provider-specific variables such as `OPENAI_API_KEY`, `OPENAI_MODEL`,
 `ANTHROPIC_API_KEY`, and `ANTHROPIC_MODEL` are also accepted.
 
+Configuring an LLM provider enables external transmission for only
+`stratum_engineer` and `stratum_explain`. Engineering sends aggregate schema
+statistics, anonymized target-class counts, the requested goal, prior aggregate
+metrics and feature names, and minimized decision status. Explanation sends the
+question, run metrics/parameters/features, and minimized decision status. Raw
+rows, target labels, resolved-flag comments/reasoning, and data-derived error
+trees are not included. Known sensitive column names, emails, SSNs, UUIDs, and
+labeled identifiers are redacted, but heuristic redaction cannot recognize
+every sensitive value. Review prompts before using an external provider and
+follow that provider's data-handling policy. Session text is stored locally in
+SQLite; on POSIX systems, the database file is restricted to the current OS user
+(owner read/write).
+
 ## Agent Workflow
 
 1. Start with `stratum_status` to recover prior runs, decisions, and current best

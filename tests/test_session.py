@@ -1,4 +1,8 @@
 import sqlite3
+import stat
+import os
+
+import pytest
 
 from stratum.session import (
     _connect, create_session, get_artifacts, get_resolved_flags, get_run, get_session,
@@ -62,3 +66,13 @@ def test_existing_decision_table_gets_safe_answers_column(tmp_path):
 
     assert "safe_answers" in columns
     assert "split_metadata" in run_columns
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")
+def test_session_database_is_owner_only(tmp_path):
+    db_path = tmp_path / "private" / "sessions.db"
+
+    with _connect(db_path):
+        pass
+
+    assert stat.S_IMODE(db_path.stat().st_mode) == 0o600

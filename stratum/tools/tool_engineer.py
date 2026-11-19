@@ -6,7 +6,7 @@ from pathlib import Path
 from ..common import load_csv
 from ..engineer import evaluate_formula
 from ..explainer import call_llm
-from ..privacy import redact_context, sanitise_for_api
+from ..privacy import redact_context, safe_flag_context, sanitise_for_api
 from ..session import ensure_session, get_resolved_flags, get_session_runs, save_artifact
 
 
@@ -26,11 +26,12 @@ def run_engineer(
     runs = get_session_runs(sid)
     prior = runs[-1] if runs else None
     context = redact_context({
-        "goal": goal, "dataset": safe, "resolved_flags": get_resolved_flags(sid),
+        "goal": goal,
+        "dataset": safe,
+        "resolved_flags": safe_flag_context(get_resolved_flags(sid), list(df.columns)),
         "prior_run": ({
             "model": prior["model_name"], "metrics": prior["metrics"],
             "top_features": prior["top_features"][:5],
-            "decision_tree_summary": prior["decision_tree_summary"],
         } if prior else None),
     }, list(df.columns) + (prior.get("feature_names", []) if prior else []))
     try:
