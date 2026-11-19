@@ -75,7 +75,7 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     split = run_split(str(binary_csv), "target", mode="stratified")
     result = tool_train.run_train(
         str(binary_csv), "target", model="rf", task="auto",
-        sid=split["sid"], split_id=split["split_id"],
+        sid=split["sid"], split_id=split["split_id"], metric="f1",
     )
     assert "error" not in result
     assert seen["rows"] == split["train_rows"] == 48
@@ -87,6 +87,11 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     assert saved_run["split_metadata"]["strategy"] == "stratified"
     assert saved_run["evaluation"]["baseline"]["name"] == "prior_dummy"
     assert saved_run["evaluation"]["comparison"]["metric"] == "accuracy"
+    assert seen["kwargs"]["metric"] == "f1"
+    assert saved_run["training_policy"]["selection"]["metric"] == "f1"
+    assert saved_run["training_policy"]["selection"]["direction"] == "maximize"
+    assert saved_run["evaluation"]["operational"]["training_wall_seconds"] >= 0
+    assert saved_run["evaluation"]["operational"]["inference_timing"]["median_ms_per_row"] >= 0
     assert "Holdout has only" in saved_run["evaluation"]["warnings"][0]
 
     internal = tool_train.run_train(
@@ -199,6 +204,18 @@ def test_classification_baseline_warns_for_missing_or_rare_holdout_classes():
     )
 
     assert any("fewer than 5 rows" in warning for warning in evaluation["warnings"])
+
+
+def test_inference_timing_reports_method_and_batch_context():
+    from stratum.tools.eval_common import inference_timing
+
+    X = pd.DataFrame({"x": range(4)})
+    result = inference_timing(lambda frame: frame["x"].to_numpy(), X, repeats=2)
+
+    assert result["rows_per_batch"] == 4
+    assert result["repeats"] == 2
+    assert result["median_batch_seconds"] >= 0
+    assert "hardware" in result["method"]
 
 
 def test_direct_training_call_is_blocked_by_pending_domain_decision(binary_csv, monkeypatch):

@@ -151,6 +151,11 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
    task metrics across a selected column with `stratum_group_evaluation`, and
    estimate fold spread with `stratum_stability`. Group evaluation reports
    support thresholds and is descriptive, not a fairness or causal assessment.
+   Training defaults to accuracy for classification and RMSE for regression;
+   pass `metric` and optionally `metric_direction` to state another tuning
+   objective. The chosen objective is saved separately from holdout metrics.
+   Run and compare outputs include local training time and warm batch inference
+   latency as hardware-dependent context, not as a combined model score.
    Stability evaluation reuses the saved split design:
    repeated stratified/group folds for IID/group data, or ordered walk-forward
    folds with the saved gap for temporal data. Predefined partitions are not

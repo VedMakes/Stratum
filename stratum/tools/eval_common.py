@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import joblib
@@ -61,6 +62,26 @@ def predict_scores(estimator, X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray |
         except Exception:
             scores = None
     return predictions, scores
+
+
+def inference_timing(predictor, X: pd.DataFrame, repeats: int = 5, max_rows: int = 100) -> dict:
+    sample = X.iloc[:max_rows]
+    if sample.empty:
+        return {"rows_per_batch": 0, "repeats": 0, "median_ms_per_row": None}
+    predictor(sample)
+    durations = []
+    for _ in range(repeats):
+        started = time.perf_counter()
+        predictor(sample)
+        durations.append(time.perf_counter() - started)
+    median_seconds = float(np.median(durations))
+    return {
+        "rows_per_batch": len(sample),
+        "repeats": repeats,
+        "median_batch_seconds": median_seconds,
+        "median_ms_per_row": median_seconds * 1000 / len(sample),
+        "method": "warm local batch prediction; hardware and system load dependent",
+    }
 
 
 def classification_metrics(y_true, y_pred, y_score=None, class_labels=None) -> dict:

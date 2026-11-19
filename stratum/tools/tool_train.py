@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import time
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +18,7 @@ from .eval_common import (
     calibration_bins,
     evaluation_warnings,
     evaluate_predictions,
+    inference_timing,
     residual_summary,
 )
 from ..session import (
@@ -163,6 +165,8 @@ def run_train(
     task: str = "auto",
     sid: str | None = None,
     split_id: str | None = None,
+    metric: str | None = None,
+    metric_direction: str | None = None,
 ) -> dict:
     df, error = load_csv(file, target)
     if error:
@@ -269,6 +273,7 @@ def run_train(
         split_metadata["cv_strategy"] = "time_series"
         split_metadata["cv_splits"] = n_splits
     try:
+        training_started = time.perf_counter()
         result = core_train()(
             selected_task, selected_model, X_train, y_train,
             tune=True,
@@ -278,7 +283,10 @@ def run_train(
             crossval=policy.crossval,
             cv_splitter=cv_splitter,
             cv_groups=cv_groups,
+            metric=metric,
+            metric_direction=metric_direction,
         )
+        training_wall_seconds = time.perf_counter() - training_started
         metrics = result.evaluate(X_test, y_test)
         evaluation = _baseline_evaluation(selected_task, y_train, y_test, metrics)
         predictions = np.asarray(result.predict(X_test))
@@ -302,6 +310,10 @@ def run_train(
                 selected_task, y_test, metrics, scores if selected_task == "classification" else None
             ) if warning not in evaluation["warnings"]
         )
+        evaluation["operational"] = {
+            "training_wall_seconds": float(training_wall_seconds),
+            "inference_timing": inference_timing(result.predict, X_test),
+        }
         top_features = result.get_feature_importance(X_test, y_test)[:20]
         tree_summary = _error_summary(result, X_test, y_test, selected_task)
     except Exception as exc:
@@ -325,6 +337,18 @@ def run_train(
         str(result.study.direction).lower().split(".")[-1]
         if result.study is not None else ("minimize" if selected_task == "regression" else "maximize")
     )
+    selection_metric = metric or ("accuracy" if selected_task == "classification" else "rmse")
+    selection_direction = metric_direction or {
+        "accuracy": "maximize", "f1": "maximize", "roc_auc": "maximize",
+        "rmse": "minimize", "mse": "minimize", "mae": "minimize", "r2": "maximize",
+    }.get(selection_metric, direction)
+    training_policy = policy.to_dict()
+    training_policy["selection"] = {
+        "metric": selection_metric,
+        "direction": selection_direction,
+        "cv_strategy": split_metadata.get("cv_strategy", "configured_by_training_policy"),
+        "cross_validation_enabled": bool(policy.crossval or cv_splitter is not None),
+    }
     metadata = {
         "model_name": selected_model, "task": selected_task, "best_params": result.best_params,
         "top_features": top_features, "decision_tree_summary": tree_summary, "optuna_top5": top5,
@@ -333,7 +357,7 @@ def run_train(
         "feature_dtypes": {c: str(t) for c, t in X_train.dtypes.items()},
         "preprocessing": result.get_pipeline_spec(), "metric_direction": direction,
         "artifact_path": str(artifact_path),
-        "training_policy": policy.to_dict(),
+        "training_policy": training_policy,
         "split_metadata": split_metadata,
         "evaluation": evaluation,
     }
@@ -347,7 +371,7 @@ def run_train(
         "model_id": model_id, "sid": sid, "model_name": selected_model, "task": selected_task,
         "metrics": metrics, "top_features": top_features, "best_params": result.best_params,
         "decision_tree_summary": tree_summary, "optuna_summary": optuna_summary,
-        "model_path": str(artifact_path), "training_policy": policy.to_dict(),
+        "model_path": str(artifact_path), "training_policy": training_policy,
         "split_metadata": split_metadata,
         "evaluation": evaluation,
     }

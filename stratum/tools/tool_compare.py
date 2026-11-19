@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from numbers import Real
 
-from ..session import get_run
+from ..session import get_artifacts, get_run
 
 
 def _primary(run: dict) -> tuple[str, float, str]:
@@ -56,8 +56,32 @@ def run_compare(model_id_a: str, model_id_b: str, sid: str | None = None) -> dic
         if a["best_params"].get(key) != b["best_params"].get(key)
     }
     narrative = f"{reason} {len(changes)} feature ranks moved materially, and {len(params)} tuned parameters differ."
+    stability_by_model = {}
+    for artifact in get_artifacts(a["sid"], "stability"):
+        if artifact.get("model_id") in {model_id_a, model_id_b}:
+            stability_by_model[artifact["model_id"]] = artifact.get("metadata", {})
+
+    def tradeoff(run, model_id):
+        operational = (run.get("evaluation") or {}).get("operational", {})
+        stability = stability_by_model.get(model_id)
+        return {
+            "selection": (run.get("training_policy") or {}).get("selection"),
+            "training_wall_seconds": operational.get("training_wall_seconds"),
+            "inference_timing": operational.get("inference_timing"),
+            "feature_count": len(run.get("feature_names") or []),
+            "top_features": (run.get("top_features") or [])[:5],
+            "stability": {
+                key: stability.get(key)
+                for key in ("metric", "mean", "std", "relative_std", "stability", "protocol")
+            } if stability else None,
+        }
     return {
         "sid": a["sid"], "winner": winner, "metric_delta": deltas,
         "feature_rank_changes": sorted(changes, key=lambda x: abs(x["delta"]), reverse=True),
         "param_differences": params, "narrative": narrative,
+        "tradeoffs": {
+            "a": tradeoff(a, model_id_a),
+            "b": tradeoff(b, model_id_b),
+            "note": "Predictive winner uses the primary holdout metric only. Runtime and feature summaries are context, not a combined score; latency is hardware/load dependent and monetary cost is not estimated.",
+        },
     }

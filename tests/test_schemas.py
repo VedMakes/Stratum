@@ -15,6 +15,7 @@ def test_split_and_train_schemas_expose_saved_split_workflow():
     train_properties = schemas["stratum_train"]["inputSchema"]["properties"]
     assert {"group_col", "split_col", "gap_rows", "seed"} <= set(split_properties)
     assert "split_id" in train_properties
+    assert {"metric", "metric_direction"} <= set(train_properties)
 
 
 def test_stability_schema_exposes_reproducible_repeats():

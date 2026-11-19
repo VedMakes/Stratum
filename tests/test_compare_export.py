@@ -35,6 +35,8 @@ def test_compare_and_export(tmp_path):
     assert comparison["winner"] == "b"
     assert comparison["metric_delta"]["accuracy"] == pytest.approx(.1)
     assert "per_class" not in comparison["metric_delta"]
+    assert comparison["tradeoffs"]["a"]["feature_count"] == 1
+    assert "not a combined score" in comparison["tradeoffs"]["note"]
     output = tmp_path / "export.py"
     exported = run_export("b", str(output))
     assert Path(exported["script_path"]).exists()
