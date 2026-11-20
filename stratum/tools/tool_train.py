@@ -24,11 +24,13 @@ from .eval_common import (
 from ..session import (
     ensure_session,
     get_artifacts,
+    get_decisions,
     get_session_by_file,
     get_workflow_blockers,
     save_artifact,
     save_run,
 )
+from ..provenance import build_run_provenance
 
 
 def _error_summary(result, X_test: pd.DataFrame, y_test: pd.Series, task: str) -> str:
@@ -323,15 +325,6 @@ def run_train(
     model_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = model_dir / f"{model_id}.joblib"
     result.save(artifact_path)
-    save_artifact(sid, "fitted_model", str(artifact_path), model_id=model_id)
-    contract = build_data_contract(df, target, features=feature_columns)
-    save_artifact(
-        sid,
-        "data_contract",
-        str(Path(file).expanduser().resolve()),
-        model_id=model_id,
-        metadata={"contract": contract},
-    )
     top5 = result.summarize_trials()
     direction = (
         str(result.study.direction).lower().split(".")[-1]
@@ -355,6 +348,40 @@ def run_train(
         "cv_strategy": split_metadata.get("cv_strategy", "configured_by_training_policy"),
         "cross_validation_enabled": bool(policy.crossval or cv_splitter is not None),
     }
+    provenance = build_run_provenance(
+        df=df,
+        source_path=file,
+        target=target,
+        feature_names=feature_columns,
+        split_metadata=split_metadata,
+        training_policy=training_policy,
+        model_name=selected_model,
+        task=selected_task,
+        best_params=result.best_params,
+        preprocessing=result.get_pipeline_spec(),
+        metrics=metrics,
+        artifact_path=artifact_path,
+        decision_ids=[decision["decision_id"] for decision in get_decisions(sid, status=None)],
+    )
+    save_artifact(
+        sid,
+        "fitted_model",
+        str(artifact_path),
+        model_id=model_id,
+        metadata={
+            "artifact_schema_version": 1,
+            "sha256": provenance["artifact"]["sha256"],
+            "size_bytes": provenance["artifact"]["size_bytes"],
+        },
+    )
+    contract = build_data_contract(df, target, features=feature_columns)
+    save_artifact(
+        sid,
+        "data_contract",
+        str(Path(file).expanduser().resolve()),
+        model_id=model_id,
+        metadata={"contract": contract},
+    )
     metadata = {
         "model_name": selected_model, "task": selected_task, "best_params": result.best_params,
         "top_features": top_features, "decision_tree_summary": tree_summary, "optuna_top5": top5,
@@ -366,6 +393,7 @@ def run_train(
         "training_policy": training_policy,
         "split_metadata": split_metadata,
         "evaluation": evaluation,
+        "provenance": provenance,
     }
     save_run(sid, model_id, result, metrics, metadata=metadata)
     best = top5[0] if top5 else None
@@ -380,4 +408,5 @@ def run_train(
         "model_path": str(artifact_path), "training_policy": training_policy,
         "split_metadata": split_metadata,
         "evaluation": evaluation,
+        "provenance": provenance,
     }

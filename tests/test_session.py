@@ -32,6 +32,7 @@ def test_session_flag_run_and_artifact_roundtrip(tmp_path):
             "training_policy": {"preset": "fast"},
             "split_metadata": {"strategy": "group", "split_id": "split_1"},
             "evaluation": {"comparison": {"metric": "f1_weighted", "improvement": .1}},
+            "provenance": {"schema_version": 1, "artifact": {"sha256": "abc"}},
         },
     )
     run = get_run("run_1")
@@ -39,6 +40,7 @@ def test_session_flag_run_and_artifact_roundtrip(tmp_path):
     assert run["training_policy"]["preset"] == "fast"
     assert run["split_metadata"]["split_id"] == "split_1"
     assert run["evaluation"]["comparison"]["improvement"] == .1
+    assert run["provenance"]["artifact"]["sha256"] == "abc"
     save_artifact(sid, "split_train", str(tmp_path / "train.csv"))
     assert get_artifacts(sid, "split_train")[0]["kind"] == "split_train"
 
@@ -69,6 +71,7 @@ def test_existing_decision_table_gets_safe_answers_column(tmp_path):
     assert "safe_answers" in columns
     assert "split_metadata" in run_columns
     assert "evaluation" in run_columns
+    assert "provenance" in run_columns
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")

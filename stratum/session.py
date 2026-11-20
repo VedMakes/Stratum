@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS runs (
     decision_tree_summary TEXT, optuna_top5 TEXT, created_at TEXT,
     dataset_path TEXT, target_col TEXT, feature_names TEXT,
     feature_dtypes TEXT, preprocessing TEXT, metric_direction TEXT,
-    artifact_path TEXT, training_policy TEXT, split_metadata TEXT, evaluation TEXT
+    artifact_path TEXT, training_policy TEXT, split_metadata TEXT, evaluation TEXT,
+    provenance TEXT
 );"""
 CREATE_ARTIFACTS = """
 CREATE TABLE IF NOT EXISTS artifacts (
@@ -62,6 +63,7 @@ RUN_COLUMNS = {
     "training_policy": "TEXT",
     "split_metadata": "TEXT",
     "evaluation": "TEXT",
+    "provenance": "TEXT",
 }
 UNSAFE_DECISION_ANSWERS = {"unknown", "deferred", "reject", "rejected"}
 
@@ -239,10 +241,12 @@ def save_run(
         "training_policy": metadata.get("training_policy", {}),
         "split_metadata": metadata.get("split_metadata", {}),
         "evaluation": metadata.get("evaluation", {}),
+        "provenance": metadata.get("provenance", {}),
     }
     json_fields = {
         "best_params", "metrics", "top_features", "optuna_top5", "feature_names",
-        "feature_dtypes", "preprocessing", "training_policy", "split_metadata", "evaluation"
+        "feature_dtypes", "preprocessing", "training_policy", "split_metadata", "evaluation",
+        "provenance",
     }
     values = [json.dumps(json_safe(payload[k])) if k in json_fields else payload[k] for k in payload]
     with _connect(db_path) as conn:
@@ -258,7 +262,8 @@ def _decode_run(row: sqlite3.Row | None) -> dict | None:
     result = dict(row)
     for key in (
         "best_params", "metrics", "top_features", "optuna_top5", "feature_names",
-        "feature_dtypes", "preprocessing", "training_policy", "split_metadata", "evaluation"
+        "feature_dtypes", "preprocessing", "training_policy", "split_metadata", "evaluation",
+        "provenance",
     ):
         try:
             result[key] = json.loads(result.get(key) or "null")

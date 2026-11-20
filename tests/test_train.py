@@ -92,6 +92,16 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     assert saved_run["training_policy"]["selection"]["direction"] == "maximize"
     assert saved_run["evaluation"]["operational"]["training_wall_seconds"] >= 0
     assert saved_run["evaluation"]["operational"]["inference_timing"]["median_ms_per_row"] >= 0
+    provenance = saved_run["provenance"]
+    assert provenance["schema_version"] == 1
+    assert provenance["dataset"]["sha256"]
+    assert provenance["dataset"]["frame_fingerprint"]
+    assert provenance["dataset"]["columns"]["target"]["dtype"]
+    assert provenance["feature_names"] == ["age", "spend", "segment", "customer_id", "leak"]
+    assert provenance["artifact"]["sha256"]
+    assert provenance["artifact"]["size_bytes"] > 0
+    assert provenance["environment"]["python"]
+    assert "f1" in provenance["metric_definitions"]
     assert "Holdout has only" in saved_run["evaluation"]["warnings"][0]
 
     internal = tool_train.run_train(
