@@ -295,10 +295,12 @@ def save_artifact(
     db_path: str | Path | None = None,
 ) -> str:
     artifact_id = f"artifact_{uuid.uuid4().hex[:10]}"
+    artifact_metadata = dict(metadata or {})
+    artifact_metadata.setdefault("artifact_schema_version", 1)
     with _connect(db_path) as conn:
         conn.execute(
             "INSERT INTO artifacts VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (artifact_id, sid, model_id, kind, path, json.dumps(json_safe(metadata or {})), _now()),
+            (artifact_id, sid, model_id, kind, path, json.dumps(json_safe(artifact_metadata)), _now()),
         )
     return artifact_id
 

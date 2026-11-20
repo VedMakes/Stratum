@@ -46,3 +46,18 @@ def test_artifact_integrity_verification_rejects_path_substitution(tmp_path):
     result = verify_run_artifact(run)
 
     assert "path differs" in result["error"]
+
+
+def test_artifact_integrity_verification_warns_on_environment_difference(tmp_path):
+    import stratum.provenance as provenance
+
+    artifact = tmp_path / "compatible.joblib"
+    artifact.write_bytes(b"artifact")
+    run = _run(artifact)
+    saved_environment = run["provenance"]["environment"]
+    saved_environment["packages"]["scikit_learn"] = "0.0-test"
+
+    result = provenance.verify_run_artifact(run)
+
+    assert "error" not in result
+    assert any("scikit_learn version differs" in warning for warning in result["warnings"])

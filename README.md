@@ -317,8 +317,24 @@ By default, fitted models are stored under `~/.stratum/models` and sessions unde
 `~/.stratum/sessions.db`. Override both with `STRATUM_HOME`, or only the database
 with `STRATUM_DB_PATH`.
 
-Only load `.joblib` artifacts from trusted sources and compatible dependency
-versions.
+Each trained run records a versioned provenance manifest: source CSV hash and
+frame fingerprint, schema, target/features, split and selection protocol,
+hyperparameters, preprocessing pipeline, decision IDs, environment versions,
+and the fitted artifact checksum. Prediction and evaluation verify the
+recorded artifact path and SHA-256 before deserialization; incompatible library
+versions produce warnings. Older runs without verifiable provenance are not
+loaded and must be retrained.
+
+Joblib deserialization can execute code. Stratum only supports artifacts created
+by its local training workflow; never register or load a `.joblib` file from an
+unknown source. The checksum detects changes relative to the saved run record,
+but is not a signature proving who created the artifact.
+
+Artifacts are retained locally and are not automatically pruned. Back up
+`STRATUM_HOME` and, when configured separately, `STRATUM_DB_PATH` together.
+Deleting individual model files leaves runs that can no longer be loaded. For
+full cleanup, stop Stratum and remove its home directory and any separately
+configured session database after preserving anything you need.
 
 ## Project Layout
 

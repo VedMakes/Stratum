@@ -203,6 +203,7 @@ def run_split(
     train.to_csv(train_path, index=False)
     test.to_csv(test_path, index=False)
     manifest = {
+        "manifest_version": 1,
         "split_id": split_id,
         "sid": sid,
         "source_path": str(source),

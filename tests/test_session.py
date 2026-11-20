@@ -42,7 +42,9 @@ def test_session_flag_run_and_artifact_roundtrip(tmp_path):
     assert run["evaluation"]["comparison"]["improvement"] == .1
     assert run["provenance"]["artifact"]["sha256"] == "abc"
     save_artifact(sid, "split_train", str(tmp_path / "train.csv"))
-    assert get_artifacts(sid, "split_train")[0]["kind"] == "split_train"
+    saved_artifact = get_artifacts(sid, "split_train")[0]
+    assert saved_artifact["kind"] == "split_train"
+    assert saved_artifact["metadata"]["artifact_schema_version"] == 1
 
 
 def test_existing_decision_table_gets_safe_answers_column(tmp_path):

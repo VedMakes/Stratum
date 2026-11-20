@@ -68,6 +68,8 @@ def test_group_split_keeps_groups_disjoint_and_persists_manifest(tmp_path):
     )
     assert manifest["metadata"]["parameters"]["seed"] == 7
     assert manifest["metadata"]["train_row_fingerprint"]
+    assert manifest["metadata"]["manifest_version"] == 1
+    assert manifest["metadata"]["artifact_schema_version"] == 1
 
 
 def test_predefined_split_uses_and_removes_assignment_column(tmp_path):
