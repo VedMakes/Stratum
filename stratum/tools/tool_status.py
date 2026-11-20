@@ -116,6 +116,10 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
             "selection": (run.get("training_policy") or {}).get("selection"),
             "operational": (run.get("evaluation") or {}).get("operational"),
             "provenance": run.get("provenance") or {},
+            "metrics": run.get("metrics") or {},
+            "top_features": run.get("top_features") or [],
+            "decision_tree_summary": run.get("decision_tree_summary") or "",
+            "preprocessing": run.get("preprocessing") or {},
         }
         if metric:
             compact[metric] = value

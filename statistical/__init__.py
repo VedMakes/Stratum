@@ -1,19 +1,23 @@
-from .catboost_model import CatBoostModel
-from .knn import KNNModel
-from .lightgbm_model import LightGBMModel
-from .logreg import LogRegModel
-from .multireg import MultiRegModel
-from .random_forest import RandomForestModel
-from .svm import SVMModel
-from .xgboost_model import XGBoostModel
+from importlib import import_module
 
-__all__ = [
-    "CatBoostModel",
-    "KNNModel",
-    "LightGBMModel",
-    "LogRegModel",
-    "MultiRegModel",
-    "RandomForestModel",
-    "SVMModel",
-    "XGBoostModel",
-]
+
+_EXPORTS = {
+    "CatBoostModel": ".catboost_model",
+    "KNNModel": ".knn",
+    "LightGBMModel": ".lightgbm_model",
+    "LogRegModel": ".logreg",
+    "MultiRegModel": ".multireg",
+    "RandomForestModel": ".random_forest",
+    "SVMModel": ".svm",
+    "XGBoostModel": ".xgboost_model",
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(_EXPORTS[name], __name__), name)
+    globals()[name] = value
+    return value

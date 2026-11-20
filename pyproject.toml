@@ -5,33 +5,41 @@ description = "Tabular ML wrappers plus local-first MCP tools for agentic workfl
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "catboost>=1.2.10",
-    "dtreeviz>=2.3.2",
-    "imbalanced-learn>=0.14.1",
     "joblib>=1.4.0",
-    "lightgbm>=4.6.0",
-    "matplotlib>=3.10.9",
-    "mcp>=1.27,<2",
     "numpy>=2.4.6",
     "optuna>=4.9.0",
     "pandas>=3.0.3",
     "scipy>=1.14.0",
     "scikit-learn>=1.8.0",
     "scikit-optimize>=0.10.2",
-    "seaborn>=0.13.2",
-    "shap>=0.52.0",
-    "statsmodels>=0.14.6",
-    "xgboost>=3.2.0",
-    "yellowbrick>=1.5",
 ]
 
 [project.scripts]
 stratum-mcp = "stratum.mcp_server:main"
+stratum = "stratum.cli:main"
 
 [project.optional-dependencies]
 test = [
     "pytest>=8.0",
     "pytest-mock>=3.14",
+]
+stratum = ["mcp>=1.27,<2"]
+smote = ["imbalanced-learn>=0.14.1"]
+catboost = ["catboost>=1.2.10"]
+lightgbm = ["lightgbm>=4.6.0"]
+xgboost = ["xgboost>=3.2.0"]
+boosters = [
+    "catboost>=1.2.10",
+    "lightgbm>=4.6.0",
+    "xgboost>=3.2.0",
+]
+visualization = [
+    "dtreeviz>=2.3.2",
+    "matplotlib>=3.10.9",
+    "seaborn>=0.13.2",
+    "shap>=0.52.0",
+    "statsmodels>=0.14.6",
+    "yellowbrick>=1.5",
 ]
 llm-openai = [
     "openai>=1.0.0",
@@ -46,6 +54,17 @@ llm = [
 dev = [
     "pytest>=8.0",
     "pytest-mock>=3.14",
+    "mcp>=1.27,<2",
+    "imbalanced-learn>=0.14.1",
+    "catboost>=1.2.10",
+    "lightgbm>=4.6.0",
+    "xgboost>=3.2.0",
+    "dtreeviz>=2.3.2",
+    "matplotlib>=3.10.9",
+    "seaborn>=0.13.2",
+    "shap>=0.52.0",
+    "statsmodels>=0.14.6",
+    "yellowbrick>=1.5",
     "openai>=1.0.0",
     "anthropic>=0.25.0",
 ]

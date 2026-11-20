@@ -27,9 +27,18 @@ class ModelSpec:
     tasks: tuple[str, ...]
     aliases: tuple[str, ...] = ()
     description: str = ""
+    optional_extra: str | None = None
 
     def load_class(self):
-        module = import_module(self.module, __package__)
+        try:
+            module = import_module(self.module, __package__)
+        except ModuleNotFoundError as exc:
+            if self.optional_extra and exc.name:
+                raise ImportError(
+                    f"Model '{self.name}' requires optional dependencies; "
+                    f"install with `pip install 'mlproj[{self.optional_extra}]'`."
+                ) from exc
+            raise
         return getattr(module, self.class_name)
 
 
@@ -49,6 +58,7 @@ MODEL_SPECS = {
         tasks=("classification", "regression"),
         aliases=("xgb",),
         description="Gradient boosting for high-performing tabular models.",
+        optional_extra="xgboost",
     ),
     "lightgbm": ModelSpec(
         name="lightgbm",
@@ -57,6 +67,7 @@ MODEL_SPECS = {
         tasks=("classification", "regression"),
         aliases=("lgbm", "lgb"),
         description="Fast gradient boosting for larger tabular datasets.",
+        optional_extra="lightgbm",
     ),
     "catboost": ModelSpec(
         name="catboost",
@@ -65,6 +76,7 @@ MODEL_SPECS = {
         tasks=("classification", "regression"),
         aliases=("cat",),
         description="Gradient boosting with good categorical-feature handling.",
+        optional_extra="catboost",
     ),
     "svm": ModelSpec(
         name="svm",

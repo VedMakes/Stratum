@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from MLProj import train
 
@@ -42,6 +43,7 @@ def test_core_policy_rejects_unsupported_model_task():
 
 
 def test_catboost_uses_core_encoder_for_categorical_data():
+    pytest.importorskip("catboost")
     X = pd.DataFrame({
         "amount": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         "segment": ["a", "b", None, "a", "b", "a"],
@@ -130,6 +132,7 @@ def test_model_cv_passes_group_labels_to_sklearn(monkeypatch):
 
 
 def test_smote_resamples_only_each_cv_training_fold(monkeypatch):
+    pytest.importorskip("imblearn.over_sampling")
     from sklearn.base import BaseEstimator
     import imblearn.over_sampling
     from MLProj.statistical.logreg import LogRegModel
@@ -162,6 +165,7 @@ def test_smote_resamples_only_each_cv_training_fold(monkeypatch):
 
 
 def test_smote_pipeline_fits_and_predicts_with_categorical_features():
+    pytest.importorskip("imblearn.over_sampling")
     X = pd.DataFrame({
         "amount": np.arange(40, dtype=float),
         "segment": ["a", "b"] * 20,

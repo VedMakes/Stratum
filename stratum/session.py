@@ -210,6 +210,18 @@ def get_resolved_flags(sid: str, db_path: str | Path | None = None) -> list[dict
     return [dict(row) for row in rows]
 
 
+def get_flags(sid: str, status: str | None = None, db_path: str | Path | None = None) -> list[dict]:
+    query = "SELECT * FROM flags WHERE sid=?"
+    params: list[Any] = [sid]
+    if status:
+        query += " AND status=?"
+        params.append(status)
+    query += " ORDER BY created_at"
+    with _connect(db_path) as conn:
+        rows = conn.execute(query, params).fetchall()
+    return [dict(row) for row in rows]
+
+
 def save_run(
     sid: str,
     model_id: str,
