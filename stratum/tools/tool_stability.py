@@ -49,7 +49,7 @@ def run_stability(
     split_metadata = run.get("split_metadata") or {}
     strategy = split_metadata.get("strategy", "stratified")
     parameters = split_metadata.get("parameters") or {}
-    warnings = []
+    warnings = list(run.get("integrity_warnings", []))
     groups = None
     temporal_gap = 0
 

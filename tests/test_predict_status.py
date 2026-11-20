@@ -10,6 +10,7 @@ from stratum.session import (
     save_flag,
     save_run,
 )
+from stratum.provenance import artifact_record, environment_snapshot
 from stratum.tools.tool_predict import run_predict
 from stratum.tools.tool_status import _best_run, _primary_metric, run_status
 
@@ -56,6 +57,11 @@ def _save_model_run(tmp_path, sid, model_id, accuracy):
         "feature_names": ["score"],
         "feature_dtypes": {"score": "float64"},
         "artifact_path": str(artifact_path),
+        "provenance": {
+            "schema_version": 1,
+            "artifact": artifact_record(artifact_path),
+            "environment": environment_snapshot(),
+        },
         "split_metadata": {"split_id": "split_saved", "strategy": "group"},
     })
     return artifact_path
@@ -90,6 +96,22 @@ def test_predict_requires_trained_features(tmp_path):
     result = run_predict("run_missing", str(data))
 
     assert "missing required feature columns" in result["error"]
+
+
+def test_predict_refuses_artifact_checksum_mismatch_before_deserialization(tmp_path, monkeypatch):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    artifact = _save_model_run(tmp_path, sid, "run_tampered", .8)
+    artifact.write_bytes(artifact.read_bytes() + b"tampered")
+    data = tmp_path / "new.csv"
+    pd.DataFrame({"score": [.2]}).to_csv(data, index=False)
+    monkeypatch.setattr(
+        "stratum.tools.tool_predict.joblib.load",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not deserialize")),
+    )
+
+    result = run_predict("run_tampered", str(data), sid=sid)
+
+    assert "checksum mismatch" in result["error"]
 
 
 def test_predict_is_blocked_by_unresolved_domain_decision(tmp_path):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import hmac
 import platform
 import sys
 from pathlib import Path
@@ -11,6 +12,7 @@ from .data.splitter import file_sha256, frame_fingerprint
 
 
 PROVENANCE_SCHEMA_VERSION = 1
+ARTIFACT_SCHEMA_VERSION = 1
 
 METRIC_DEFINITIONS = {
     "accuracy": "Fraction of evaluated rows whose predicted class matches the true class.",
@@ -44,6 +46,50 @@ def environment_snapshot() -> dict:
         except importlib.metadata.PackageNotFoundError:
             versions[key] = None
     return {"python": sys.version.split()[0], "platform": platform.platform(), "packages": versions}
+
+
+def artifact_record(path: str | Path) -> dict:
+    artifact = Path(path).expanduser().resolve()
+    return {
+        "schema_version": ARTIFACT_SCHEMA_VERSION,
+        "path": str(artifact),
+        "format": "joblib",
+        "sha256": file_sha256(artifact),
+        "size_bytes": int(artifact.stat().st_size),
+    }
+
+
+def verify_run_artifact(run: dict) -> dict:
+    provenance = run.get("provenance") or {}
+    record = provenance.get("artifact") or {}
+    path = Path(run.get("artifact_path") or "").expanduser()
+    if provenance.get("schema_version") != PROVENANCE_SCHEMA_VERSION or not record.get("sha256"):
+        return {"error": "Model artifact has no verifiable provenance. Retrain it before loading."}
+    try:
+        resolved = path.resolve(strict=True)
+        if not resolved.is_file():
+            return {"error": "Recorded model artifact is not a regular file."}
+        if str(resolved) != record.get("path"):
+            return {"error": "Model artifact path differs from its provenance record."}
+        actual_digest = file_sha256(resolved)
+    except OSError as exc:
+        return {"error": f"Unable to verify model artifact: {exc}"}
+    if not hmac.compare_digest(actual_digest, str(record["sha256"]).lower()):
+        return {"error": "Model artifact checksum mismatch; refusing to deserialize it."}
+
+    current = environment_snapshot()
+    saved = provenance.get("environment") or {}
+    package_warnings = [
+        f"{name} version differs from the training environment ({saved_version} vs {current['packages'].get(name)})."
+        for name, saved_version in (saved.get("packages") or {}).items()
+        if saved_version and current["packages"].get(name) and saved_version != current["packages"].get(name)
+    ]
+    warnings = list(package_warnings)
+    if saved.get("python") and saved["python"].split(".")[:2] != current["python"].split(".")[:2]:
+        warnings.append(
+            f"Python version differs from the training environment ({saved['python']} vs {current['python']})."
+        )
+    return {"warnings": warnings}
 
 
 def build_run_provenance(
@@ -99,11 +145,6 @@ def build_run_provenance(
             "preprocessing_pipeline": preprocessing,
         },
         "environment": environment_snapshot(),
-        "artifact": {
-            "path": str(artifact.resolve()),
-            "format": "joblib",
-            "sha256": file_sha256(artifact),
-            "size_bytes": int(artifact.stat().st_size),
-        },
+        "artifact": artifact_record(artifact),
         "lineage": {"parent_model_id": None, "decision_ids": sorted(set(decision_ids))},
     }

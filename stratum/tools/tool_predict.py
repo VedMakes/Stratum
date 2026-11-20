@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from ..common import json_safe, load_csv
+from ..provenance import verify_run_artifact
 from ..session import get_run, get_workflow_blockers, save_artifact
 
 
@@ -48,6 +49,9 @@ def run_predict(
         }
     if not run.get("artifact_path"):
         return {"error": f"Model '{model_id}' has no fitted artifact path."}
+    integrity = verify_run_artifact(run)
+    if "error" in integrity:
+        return integrity
 
     df, error = load_csv(file)
     if error:
@@ -103,5 +107,6 @@ def run_predict(
             _positive_count(predictions, confidence)
             if run["task"] == "classification" else None
         ),
+        "warnings": integrity["warnings"],
         "output_path": str(saved_path) if saved_path else None,
     })

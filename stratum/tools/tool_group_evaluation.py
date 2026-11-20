@@ -64,7 +64,7 @@ def run_group_evaluation(
     groups.sort(key=lambda item: (-item["support"], item["value"]))
 
     excluded = len(grouped) - len(supported)
-    warnings = []
+    warnings = list(run.get("integrity_warnings", []))
     if excluded:
         warnings.append(
             f"Excluded {excluded} group(s) with fewer than {min_support} rows; their metrics are not reported."

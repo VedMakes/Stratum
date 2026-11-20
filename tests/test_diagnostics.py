@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from stratum.session import create_session, get_artifacts, save_run
+from stratum.provenance import artifact_record, environment_snapshot
 from stratum.tools.tool_report import run_report
 from stratum.tools.tool_segments import run_segments
 from stratum.tools.tool_group_evaluation import run_group_evaluation
@@ -17,6 +18,14 @@ class Result:
     model_name = "logistic_regression"
     task = "classification"
     best_params = {}
+
+
+def _provenance(path):
+    return {
+        "schema_version": 1,
+        "artifact": artifact_record(path),
+        "environment": environment_snapshot(),
+    }
 
 
 def _training_frame(rows=80):
@@ -39,6 +48,7 @@ def _save_classifier(tmp_path, sid, model_id="diagnostic_model"):
         "feature_dtypes": {"score": "float64"},
         "target_col": "target",
         "artifact_path": str(artifact_path),
+        "provenance": _provenance(artifact_path),
     })
     return model_id
 
@@ -203,6 +213,7 @@ def test_group_stability_uses_disjoint_groups_in_each_repeat(tmp_path, monkeypat
         "model_name": "logistic_regression", "task": "classification",
         "feature_names": ["score"], "target_col": "target",
         "artifact_path": str(tmp_path / f"{model_id}.joblib"),
+        "provenance": _provenance(tmp_path / f"{model_id}.joblib"),
         "split_metadata": {"strategy": "group", "parameters": {"group_col": "entity"}},
     })
     data = tmp_path / "group_eval.csv"
@@ -242,6 +253,7 @@ def test_temporal_stability_preserves_order_and_gap(tmp_path, monkeypatch):
         "model_name": "logistic_regression", "task": "classification",
         "feature_names": ["score"], "target_col": "target",
         "artifact_path": str(tmp_path / f"{model_id}.joblib"),
+        "provenance": _provenance(tmp_path / f"{model_id}.joblib"),
         "split_metadata": {
             "strategy": "temporal",
             "parameters": {"time_col": "when", "gap_rows": 2},
@@ -283,6 +295,7 @@ def test_predefined_stability_requires_validation_not_resplitting(tmp_path):
         "model_name": "logistic_regression", "task": "classification",
         "feature_names": ["score"], "target_col": "target",
         "artifact_path": str(tmp_path / f"{model_id}.joblib"),
+        "provenance": _provenance(tmp_path / f"{model_id}.joblib"),
         "split_metadata": {"strategy": "predefined", "parameters": {}},
     })
     data = tmp_path / "predefined.csv"

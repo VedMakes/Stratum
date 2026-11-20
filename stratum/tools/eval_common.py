@@ -22,6 +22,7 @@ from sklearn.metrics import (
 )
 
 from ..common import load_csv
+from ..provenance import verify_run_artifact
 from ..session import get_run
 
 
@@ -33,7 +34,11 @@ def load_run_model(model_id: str, sid: str | None = None) -> tuple[dict | None, 
         return None, None, {"error": f"Model '{model_id}' does not belong to session '{sid}'."}
     if not run.get("artifact_path"):
         return None, None, {"error": f"Model '{model_id}' has no fitted artifact path."}
+    integrity = verify_run_artifact(run)
+    if "error" in integrity:
+        return None, None, {"error": integrity["error"]}
     try:
+        run["integrity_warnings"] = integrity["warnings"]
         return run, joblib.load(run["artifact_path"]), None
     except Exception as exc:
         return None, None, {"error": f"Unable to load model artifact: {type(exc).__name__}: {exc}"}

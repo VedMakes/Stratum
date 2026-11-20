@@ -30,7 +30,7 @@ from ..session import (
     save_artifact,
     save_run,
 )
-from ..provenance import build_run_provenance
+from ..provenance import artifact_record, build_run_provenance
 
 
 def _error_summary(result, X_test: pd.DataFrame, y_test: pd.Series, task: str) -> str:
@@ -370,8 +370,7 @@ def run_train(
         model_id=model_id,
         metadata={
             "artifact_schema_version": 1,
-            "sha256": provenance["artifact"]["sha256"],
-            "size_bytes": provenance["artifact"]["size_bytes"],
+            **artifact_record(artifact_path),
         },
     )
     contract = build_data_contract(df, target, features=feature_columns)

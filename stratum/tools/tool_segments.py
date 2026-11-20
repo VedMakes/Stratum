@@ -94,4 +94,5 @@ def run_segments(
         "rows_evaluated": len(df),
         "overall_error": overall,
         "segments": worst,
+        "warnings": list(run.get("integrity_warnings", [])),
     })

@@ -38,7 +38,8 @@ def run_validate(
         "rows_evaluated": len(df),
         "metrics": metrics,
         "target": target or run.get("target_col"),
-        "warnings": evaluation_warnings(run["task"], y, metrics, scores),
+        "warnings": evaluation_warnings(run["task"], y, metrics, scores)
+        + list(run.get("integrity_warnings", [])),
     }
     if run["task"] == "regression":
         result["residuals"] = residual_summary(y, predictions)
