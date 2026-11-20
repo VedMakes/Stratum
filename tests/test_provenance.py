@@ -35,6 +35,17 @@ def test_artifact_integrity_verification_rejects_modified_or_legacy_artifacts(tm
     assert "no verifiable provenance" in legacy["error"]
 
 
+def test_artifact_integrity_verification_rejects_unknown_manifest_version(tmp_path):
+    artifact = tmp_path / "future.joblib"
+    artifact.write_bytes(b"artifact")
+    run = _run(artifact)
+    run["provenance"]["artifact"]["schema_version"] = 2
+
+    result = verify_run_artifact(run)
+
+    assert "no verifiable provenance" in result["error"]
+
+
 def test_artifact_integrity_verification_rejects_path_substitution(tmp_path):
     original = tmp_path / "original.joblib"
     substituted = tmp_path / "substituted.joblib"

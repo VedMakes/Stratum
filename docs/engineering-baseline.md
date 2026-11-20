@@ -239,7 +239,23 @@ Milestone 2 methodological evaluation is complete against the roadmap:
   verification with `.venv/bin/python -m pytest -q` passed:
   **93 passed** in 4.83 seconds.
 
-Next linear task: begin Milestone 3 artifact reproducibility and integrity,
-starting with an audit of existing fingerprints, schema records, environment
-versions, and artifact checksums before changing persistence.
+Milestone 3 reproducibility and artifact integrity is implemented:
+
+- Run records have a backward-compatible provenance column containing a
+  versioned source hash/frame fingerprint/schema, target/features/split,
+  selection and metric definitions, hyperparameters, fitted pipeline,
+  dependency/Python environment, artifact digest, and decision lineage.
+- Split manifests and artifact metadata are versioned. Model loading in
+  prediction and evaluation verifies the recorded path, artifact schema, and
+  SHA-256 before joblib deserialization. Legacy runs without verifiable
+  provenance and changed artifacts are refused; dependency-version drift is
+  surfaced as a warning.
+- The README defines the joblib trust boundary, legacy behavior, backup needs,
+  and retention policy. Artifacts are retained without automatic pruning.
+- Focused tests passed after each submodule. Final M3 full-suite verification
+  with `.venv/bin/python -m pytest -q` passed: **99 passed** in 6.65 seconds.
+
+Next linear task: begin Milestone 4 operational usability, starting with a
+scoped dependency-extras audit and confirming the documented CLI/workflow
+entrypoints before changing packaging.
 

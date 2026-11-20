@@ -18,6 +18,7 @@ METRIC_DEFINITIONS = {
     "accuracy": "Fraction of evaluated rows whose predicted class matches the true class.",
     "balanced_accuracy": "Mean per-class recall; less dominated by the majority class than accuracy.",
     "f1_weighted": "Support-weighted mean of per-class F1 scores.",
+    "f1": "Support-weighted mean of per-class F1 scores used by the optimizer.",
     "precision_weighted": "Support-weighted mean of per-class precision.",
     "recall_weighted": "Support-weighted mean of per-class recall.",
     "pr_auc": "Average precision over the precision-recall curve for the recorded positive class.",
@@ -63,7 +64,11 @@ def verify_run_artifact(run: dict) -> dict:
     provenance = run.get("provenance") or {}
     record = provenance.get("artifact") or {}
     path = Path(run.get("artifact_path") or "").expanduser()
-    if provenance.get("schema_version") != PROVENANCE_SCHEMA_VERSION or not record.get("sha256"):
+    if (
+        provenance.get("schema_version") != PROVENANCE_SCHEMA_VERSION
+        or record.get("schema_version") != ARTIFACT_SCHEMA_VERSION
+        or not record.get("sha256")
+    ):
         return {"error": "Model artifact has no verifiable provenance. Retrain it before loading."}
     try:
         resolved = path.resolve(strict=True)
@@ -146,5 +151,10 @@ def build_run_provenance(
         },
         "environment": environment_snapshot(),
         "artifact": artifact_record(artifact),
-        "lineage": {"parent_model_id": None, "decision_ids": sorted(set(decision_ids))},
+        "lineage": {
+            "source_run_id": None,
+            "parent_model_id": None,
+            "parent_artifact_sha256": None,
+            "decision_ids": sorted(set(decision_ids)),
+        },
     }

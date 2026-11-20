@@ -102,6 +102,12 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     assert provenance["artifact"]["size_bytes"] > 0
     assert provenance["environment"]["python"]
     assert "f1" in provenance["metric_definitions"]
+    assert provenance["lineage"] == {
+        "source_run_id": None,
+        "parent_model_id": None,
+        "parent_artifact_sha256": None,
+        "decision_ids": [],
+    }
     assert "Holdout has only" in saved_run["evaluation"]["warnings"][0]
 
     internal = tool_train.run_train(
