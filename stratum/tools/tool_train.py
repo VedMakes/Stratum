@@ -338,7 +338,13 @@ def run_train(
         if result.study is not None else ("minimize" if selected_task == "regression" else "maximize")
     )
     selection_metric = metric or ("accuracy" if selected_task == "classification" else "rmse")
-    selection_direction = metric_direction or {
+    requested_direction = (metric_direction or "").strip().lower()
+    direction_aliases = {
+        "max": "maximize", "maximize": "maximize", "higher": "maximize",
+        "higher_is_better": "maximize", "min": "minimize", "minimize": "minimize",
+        "lower": "minimize", "lower_is_better": "minimize",
+    }
+    selection_direction = direction_aliases.get(requested_direction) or {
         "accuracy": "maximize", "f1": "maximize", "roc_auc": "maximize",
         "rmse": "minimize", "mse": "minimize", "mae": "minimize", "r2": "maximize",
     }.get(selection_metric, direction)

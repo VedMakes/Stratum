@@ -222,6 +222,24 @@ Milestone 2 support-aware subgroup evaluation is implemented:
   verification with `.venv/bin/python -m pytest -q` passed:
   **88 passed** in 5.82 seconds.
 
-Next linear task: review the source roadmap and continue with the next
-unimplemented data/ML workflow milestone.
+Milestone 2 methodological evaluation is complete against the roadmap:
+
+- Task-appropriate baselines, per-class/probability classification metrics,
+  regression metrics, robust residual summaries, calibration bins, and
+  metric-suitability warnings are available in training/validation results.
+- Repeated, split-aware stability evaluation and time-aware/group-aware
+  evaluation preserve their saved protocols. Predefined holdouts are not
+  randomly re-split. Group evaluation exposes support and excluded groups.
+- The optimization metric and direction are configurable and persisted;
+  session ranking and pairwise comparison honor the saved objective. Runs
+  report warm local inference latency and training wall time alongside feature
+  and saved stability summaries, without combining trade-offs into a score.
+  Monetary cost is not estimated; timing is hardware/load dependent.
+- Focused tests passed after each implementation increment. Final full-suite
+  verification with `.venv/bin/python -m pytest -q` passed:
+  **93 passed** in 4.83 seconds.
+
+Next linear task: begin Milestone 3 artifact reproducibility and integrity,
+starting with an audit of existing fingerprints, schema records, environment
+versions, and artifact checksums before changing persistence.
 

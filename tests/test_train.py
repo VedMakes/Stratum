@@ -75,7 +75,7 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     split = run_split(str(binary_csv), "target", mode="stratified")
     result = tool_train.run_train(
         str(binary_csv), "target", model="rf", task="auto",
-        sid=split["sid"], split_id=split["split_id"], metric="f1",
+        sid=split["sid"], split_id=split["split_id"], metric="f1", metric_direction="max",
     )
     assert "error" not in result
     assert seen["rows"] == split["train_rows"] == 48
