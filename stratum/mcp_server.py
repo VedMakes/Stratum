@@ -4,7 +4,10 @@ import argparse
 import asyncio
 import inspect
 import json
+import os
+import queue
 import sys
+import threading
 from typing import Any
 
 from .schemas import ALL_TOOLS
@@ -111,12 +114,47 @@ async def _run() -> None:
     from mcp.server.stdio import stdio_server
 
     server = create_server()
-    async with stdio_server() as (read_stream, write_stream):
+    async with stdio_server(stdin=_StdinLineStream()) as (read_stream, write_stream):
         await server.run(
             read_stream,
             write_stream,
             server.create_initialization_options(),
         )
+
+
+class _StdinLineStream:
+    """Bridge blocking stdin reads without tying them to AnyIO's worker pool."""
+
+    def __aiter__(self):
+        return self._read_lines()
+
+    async def _read_lines(self):
+        lines: queue.Queue[str | None] = queue.Queue()
+
+        def read_stdin() -> None:
+            pending = bytearray()
+            try:
+                while chunk := os.read(sys.stdin.fileno(), 4096):
+                    pending.extend(chunk)
+                    while (newline := pending.find(b"\n")) >= 0:
+                        raw_line = bytes(pending[:newline + 1])
+                        del pending[:newline + 1]
+                        lines.put(raw_line.decode("utf-8", errors="replace"))
+                if pending:
+                    lines.put(bytes(pending).decode("utf-8", errors="replace"))
+            finally:
+                lines.put(None)
+
+        threading.Thread(target=read_stdin, name="stratum-stdio-reader", daemon=True).start()
+        while True:
+            try:
+                line = lines.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.02)
+                continue
+            if line is None:
+                return
+            yield line
 
 
 def main(argv: list[str] | None = None) -> None:

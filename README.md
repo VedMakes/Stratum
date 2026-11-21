@@ -118,6 +118,10 @@ After installation, configure your MCP client to launch `stratum-mcp`:
 }
 ```
 
+The stdio setup is covered by a subprocess smoke test that completes MCP
+initialization and lists the registered tools. CI runs this handshake against
+the installed package.
+
 If your client does not inherit the virtualenv `PATH`, use the absolute script
 path instead, for example:
 

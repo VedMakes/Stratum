@@ -41,9 +41,8 @@ failures unless a test or experiment demonstrated the behavior.
 - In-process MCP initialization and `tools/list` succeeded with 27 tools.
 - A subprocess stdio MCP initialization timed out in the clean environment. The
   same timeout reproduced with a minimal `mcp.Server` using the same installed
-  MCP SDK, while the in-process handshake passed. Treat this as an unresolved
-  SDK/stdio transport investigation, not a Stratum-specific defect until
-  isolated further.
+  MCP SDK, while the in-process handshake passed. This was later isolated and
+  resolved in M5 below.
 - At the M0 checkpoint, `python -m pytest` passed: **50 passed** in the
   disposable environment. The current working tree has additional focused and
   full-suite results recorded below.
@@ -282,7 +281,25 @@ Milestone 4 operational usability is implemented:
   training, and HTML report generation. Final full-suite verification is
   recorded below after completion.
 
-M0-M4 from the current roadmap are complete. The unresolved stdio MCP SDK
-handshake investigation recorded under M0 remains a known issue, not part of
-the operational-usability milestone.
+M0-M4 from the source roadmap are complete. The requested M5 transport
+reliability increment is implemented:
+
+- The timeout reproduced with the MCP SDK's default stdio reader and with a
+  minimal SDK server. The SDK wrapped stdin in an AnyIO worker-thread file read;
+  in this Python 3.12 environment it did not deliver the subprocess client's
+  JSON-RPC input to the server.
+- Stratum continues to use the SDK's stdio transport and protocol/session
+  handling, but supplies an async line source backed by one daemon stdin-reader
+  thread and a thread-safe queue. This avoids relying on the stalled worker-pool
+  stdin read while keeping MCP framing and response handling in the SDK.
+- A regression test launches the server as a subprocess with the official SDK
+  client, completes `initialize`, calls `tools/list`, and checks that every
+  registered schema is returned. The README and CI now cover the supported
+  startup path.
+- The documented `.[stratum,test]` install completed in a clean temporary
+  environment with MCP 1.30.0 and AnyIO 4.16.0; `pip check` found no broken
+  requirements. The installed `stratum-mcp` executable completed the same
+  initialize/list-tools handshake.
+- Focused MCP tests passed: **4 passed**. Final full-suite verification with
+  `.venv/bin/python -m pytest -q` passed: **111 passed** in 18.41 seconds.
 
