@@ -53,7 +53,10 @@ def test_agent_workflow_and_direct_guardrail_bypasses(tmp_path, monkeypatch):
     def call(name, arguments):
         return asyncio.run(dispatch_tool(name, arguments))
 
-    profile = call("stratum_profile", {"file": str(data_path), "target": "outcome"})
+    profile = call("stratum_profile", {
+        "file": str(data_path), "target": "outcome",
+        "goal": "Estimate how the recorded outcome relates to the signal.",
+    })
     sid = profile["sid"]
     assert call("stratum_status", {"sid": sid})["runs"] == []
 
@@ -186,6 +189,8 @@ def test_agent_workflow_and_direct_guardrail_bypasses(tmp_path, monkeypatch):
     assert prediction_path.exists()
     assert exported["script_path"] == str(export_path)
     assert report["best_model"] == model_id
+    assert report["session_goal"] == "Estimate how the recorded outcome relates to the signal."
+    assert report["question_history"][0]["actor"] == "user"
     assert {"validation", "segment_analysis", "export_script"} <= set(report["diagnostics"])
     assert status["runs"][0]["split_id"] == split["split_id"]
     assert status["runs"][0]["baseline_comparison"]["metric"] == "accuracy"

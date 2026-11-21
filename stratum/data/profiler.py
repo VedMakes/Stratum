@@ -8,7 +8,7 @@ import pandas as pd
 from scipy.stats import chi2_contingency, pointbiserialr
 
 from ..common import json_safe, load_csv
-from ..session import ensure_session, save_artifact
+from ..session import ensure_session, get_journal, log_event, save_artifact, set_session_goal
 from .contracts import build_data_contract
 
 
@@ -149,13 +149,24 @@ def detect_constant_and_quasi_constant(
     return results
 
 
-def run_profile(file: str, target: str | None = None, sid: str | None = None) -> dict:
+def run_profile(
+    file: str, target: str | None = None, sid: str | None = None, goal: str | None = None
+) -> dict:
     df, error = load_csv(file, target)
     if error:
         return error
-    sid, error = ensure_session(sid, file, target or "")
+    question = goal.strip()[:1000] if goal and goal.strip() else ""
+    sid, error = ensure_session(sid, file, target or "", question)
     if error:
         return error
+    if question:
+        set_session_goal(sid, question)
+        prior_questions = get_journal(sid, event_type="analytical_question", limit=100)
+        if not any(item["summary"] == question for item in prior_questions):
+            log_event(
+                sid, "user", "analytical_question", question,
+                {"question": question},
+            )
     columns = []
     for name in df.columns:
         series = df[name]

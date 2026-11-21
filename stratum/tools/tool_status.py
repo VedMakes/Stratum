@@ -73,6 +73,58 @@ def _engineered_features(artifacts: list[dict]) -> list[str]:
     return names
 
 
+def _run_change(previous: dict | None, current: dict) -> dict | None:
+    if previous is None:
+        return None
+    previous_provenance = previous.get("provenance") or {}
+    current_provenance = current.get("provenance") or {}
+    previous_dataset = (previous_provenance.get("dataset") or {}).get("sha256")
+    current_dataset = (current_provenance.get("dataset") or {}).get("sha256")
+    same_dataset = previous_dataset == current_dataset if previous_dataset and current_dataset else None
+    same_target = (
+        previous.get("target_col") == current.get("target_col")
+        if previous.get("target_col") and current.get("target_col") else None
+    )
+    previous_split = previous.get("split_metadata") or {}
+    current_split = current.get("split_metadata") or {}
+    split_keys = ("train_row_fingerprint", "test_row_fingerprint")
+    same_split = (
+        all(previous_split.get(key) and current_split.get(key) for key in split_keys)
+        and all(previous_split[key] == current_split[key] for key in split_keys)
+    )
+    previous_metric, previous_score, previous_direction = _primary_metric(previous)
+    current_metric, current_score, current_direction = _primary_metric(current)
+    previous_decisions = set((previous_provenance.get("lineage") or {}).get("decision_ids") or [])
+    current_decisions = set((current_provenance.get("lineage") or {}).get("decision_ids") or [])
+    comparable = bool(
+        same_dataset is True and same_target is True and same_split
+        and previous_metric == current_metric
+        and previous_direction == current_direction
+        and previous_score is not None and current_score is not None
+    )
+    delta = None
+    if comparable:
+        raw_delta = current_score - previous_score
+        delta = raw_delta if current_direction == "maximize" else -raw_delta
+    return {
+        "previous_model_id": previous["model_id"],
+        "same_dataset": same_dataset,
+        "same_target": same_target,
+        "same_split": bool(same_split),
+        "added_features": sorted(set(current.get("feature_names") or []) - set(previous.get("feature_names") or [])),
+        "removed_features": sorted(set(previous.get("feature_names") or []) - set(current.get("feature_names") or [])),
+        "new_decision_ids": sorted(current_decisions - previous_decisions),
+        "metric": current_metric if comparable else None,
+        "metric_delta": delta,
+        "metric_comparable": comparable,
+        "note": (
+            "Metric change is direction-adjusted and compares the same dataset, target, and exact saved partition."
+            if comparable else
+            "Scores are not compared because dataset, target, split fingerprint, or metric protocol differs or is unavailable."
+        ),
+    }
+
+
 def run_status(sid: str | None = None, file: str | None = None) -> dict:
     session = get_session(sid) if sid else None
     if session is None and file:
@@ -107,7 +159,7 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
         improvement = delta if best_direction == "maximize" else -delta
 
     compact_runs = []
-    for run in runs:
+    for index, run in enumerate(runs):
         metric, value, _ = _primary_metric(run)
         compact = {
             "model_id": run["model_id"],
@@ -130,6 +182,10 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
             "dataset_rows": (run.get("provenance") or {}).get("dataset", {}).get("rows"),
             "dataset_sha256": (run.get("provenance") or {}).get("dataset", {}).get("sha256"),
             "split_strategy": (run.get("split_metadata") or {}).get("strategy"),
+            "target": run.get("target_col"),
+            "feature_names": run.get("feature_names") or [],
+            "lineage": (run.get("provenance") or {}).get("lineage") or {},
+            "change_from_previous": _run_change(runs[index - 1] if index else None, run),
         }
         if metric:
             compact[metric] = value
@@ -138,6 +194,8 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
     return json_safe({
         "sid": sid,
         "dataset": Path(session["dataset_path"]).name if session.get("dataset_path") else "",
+        "session_goal": session.get("goal") or "",
+        "question_history": list(reversed(get_journal(sid, event_type="analytical_question", limit=100))),
         "runs": compact_runs,
         "best_model": best["model_id"] if best else None,
         "resolved_flags": get_resolved_flags(sid),

@@ -22,7 +22,11 @@ your behavior; Stratum code, not these instructions, enforces critical gates.
 
 - When a session ID or prior dataset is known, call `stratum_status` first and
   carry its `sid` forward. Otherwise start with `stratum_profile` using the
-  local CSV path and, when known, the target.
+  local CSV path and, when known, the target. Include the user's concise
+  analytical question in the optional `goal` field; this is saved locally as
+  session context, not as a raw conversation transcript. For an existing
+  session, record a material change in the user's question with
+  `stratum_log_event` (`analytical_question`).
 - Use `stratum_audit` for general modeling risks. Add `stratum_leakage_deep`,
   `stratum_label_quality`, `stratum_schema_check`, or `stratum_join_check` when
   the question and data warrant them; these tools have different inputs, so
@@ -74,7 +78,9 @@ your behavior; Stratum code, not these instructions, enforces critical gates.
   results.
 - Use `stratum_report` to preserve the session summary. Include the important
   assumptions, decisions, split protocol, baseline comparison, warnings, and
-  limitations in your conversational handoff.
+  limitations in your conversational handoff. Check `change_from_previous`
+  before describing score improvement; only compare metrics when Stratum says
+  the data, target, exact partition, and metric protocol match.
 - After a saved run, use `stratum_recommend` to ground proposed next steps in
   saved evidence. Explain the cited run/artifact, trade-off, and what would
   change the suggestion. Recommendations are not user choices; ask and record

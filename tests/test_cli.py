@@ -26,6 +26,21 @@ def test_cli_profiles_and_inspects_session_artifacts(tmp_path, capsys):
     assert artifacts["artifacts"]
 
 
+def test_cli_profile_saves_the_user_question(tmp_path, capsys):
+    data = tmp_path / "customers.csv"
+    pd.DataFrame({"spend": range(40), "target": [0, 1] * 20}).to_csv(data, index=False)
+
+    result = main([
+        "profile", str(data), "--target", "target", "--goal",
+        "Estimate customer churn risk.",
+    ])
+    profile = json.loads(capsys.readouterr().out)
+
+    assert result == 0
+    from stratum.tools.tool_status import run_status
+    assert run_status(sid=profile["sid"])["session_goal"] == "Estimate customer churn risk."
+
+
 def test_cli_split_forwards_split_design(tmp_path, capsys):
     data = tmp_path / "customers.csv"
     pd.DataFrame({"spend": range(60), "target": [0, 1] * 30}).to_csv(data, index=False)
@@ -92,7 +107,7 @@ def test_cli_writes_self_contained_html_report(tmp_path, capsys):
     data = tmp_path / "customers.csv"
     pd.DataFrame({"spend": range(40), "target": [0, 1] * 20}).to_csv(data, index=False)
     profile = __import__("stratum.data.profiler", fromlist=["run_profile"]).run_profile(
-        str(data), target="target"
+        str(data), target="target", goal="Assess customer risk from the recorded features."
     )
     save_run(profile["sid"], "run-html", _ReportRun(), {"accuracy": .75}, metadata={
         "model_name": "demo", "task": "classification", "feature_names": ["spend"],
@@ -108,3 +123,4 @@ def test_cli_writes_self_contained_html_report(tmp_path, capsys):
     assert "Stratum session report" in html_report
     assert "Data risks and assumptions" in html_report
     assert "Provenance" in html_report
+    assert "Assess customer risk from the recorded features." in html_report

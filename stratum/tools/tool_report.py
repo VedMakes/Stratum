@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..common import json_safe
-from ..session import get_artifacts, get_decisions, get_flags
+from ..session import get_artifacts, get_decisions, get_flags, get_journal
 from .tool_status import run_status
 
 
@@ -53,6 +53,8 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
     return json_safe({
         "sid": status["sid"],
         "dataset": status["dataset"],
+        "session_goal": status["session_goal"],
+        "question_history": status["question_history"],
         "best_model": status["best_model"],
         "current_metric": status["current_metric"],
         "current_score": status["current_score"],
@@ -66,6 +68,14 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
         "pending_decisions": status.get("pending_decisions", []),
         "blocking_decisions": status.get("blocking_decisions", []),
         "recent_journal": status.get("recent_journal", []),
+        "journal": get_journal(status["sid"], limit=100),
+        "assumptions_and_caveats": get_journal(
+            status["sid"], event_type="assumption_caveat", limit=100
+        ),
+        "changes_since_previous_run": [
+            {"model_id": run["model_id"], **run["change_from_previous"]}
+            for run in status["runs"] if run.get("change_from_previous")
+        ],
         "engineered_features": status["engineered_features"],
         "diagnostics": diagnostics,
         "recommended_next_actions": recommended_next_actions,

@@ -17,6 +17,7 @@ def _parser() -> argparse.ArgumentParser:
     profile.add_argument("file")
     profile.add_argument("--target")
     profile.add_argument("--sid")
+    profile.add_argument("--goal", help="Optional concise analytical question to save in the local session.")
 
     audit = commands.add_parser("audit", help="Inspect a dataset for modelling risks.")
     audit.add_argument("file")
@@ -100,7 +101,7 @@ def _execute(args: argparse.Namespace) -> dict:
     if args.command == "profile":
         from .data.profiler import run_profile
 
-        return run_profile(args.file, target=args.target, sid=args.sid)
+        return run_profile(args.file, target=args.target, sid=args.sid, goal=args.goal)
     if args.command == "audit":
         from .tools.tool_audit import run_audit
 

@@ -31,13 +31,14 @@ def render_report_html(report: dict) -> str:
     ) or '<tr><td colspan="5">No model runs recorded.</td></tr>'
     summary = {
         key: report.get(key)
-        for key in ("sid", "dataset", "best_model", "current_metric", "current_score", "baseline_score", "improvement")
+        for key in ("sid", "dataset", "session_goal", "best_model", "current_metric", "current_score", "baseline_score", "improvement")
     }
     evidence = [
         f"<article><h3>{html.escape(str(run.get('model_id', 'Run')))}</h3>"
         f"<h4>Holdout metrics</h4>{_pre(run.get('metrics', {}))}"
         f"<h4>Feature importance and error evidence</h4>{_pre({'top_features': run.get('top_features', []), 'error_segments': run.get('decision_tree_summary', '')})}"
         f"<h4>Split and selection protocol</h4>{_pre({'split': (run.get('provenance') or {}).get('split', {}), 'selection': run.get('selection')})}"
+        f"<h4>Change from previous run</h4>{_pre(run.get('change_from_previous'))}"
         f"<h4>Provenance</h4>{_pre(run.get('provenance', {}))}</article>"
         for run in runs
     ] or "<p>No run evidence recorded.</p>"
@@ -48,6 +49,13 @@ def render_report_html(report: dict) -> str:
     )
     content = [
         _section("Session summary", _pre(summary)),
+        _section("Question, assumptions, and journal", _pre({
+            "session_goal": report.get("session_goal", ""),
+            "question_history": report.get("question_history", []),
+            "assumptions_and_caveats": report.get("assumptions_and_caveats", []),
+            "decisions": report.get("decisions", []),
+            "journal": report.get("journal", []),
+        })),
         _section("Model comparison", table),
         _section("Data risks and assumptions", _pre({
             "flags": report.get("flags", []),

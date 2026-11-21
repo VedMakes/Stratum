@@ -193,7 +193,9 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
 ## Agent Workflow
 
 1. Start with `stratum_status` to recover prior runs, decisions, and current best
-   model for the session.
+   model for the session. When starting a new session, pass the concise
+   analytical question as `goal` to `stratum_profile`; it is stored locally, not
+   as a conversation transcript.
 2. Profile and contract the dataset with `stratum_profile`.
 3. Audit data risks with `stratum_audit`, `stratum_leakage_deep`,
    `stratum_label_quality`, `stratum_join_check`, and `stratum_schema_check`.

@@ -145,6 +145,19 @@ def get_session(sid: str, db_path: str | Path | None = None) -> dict | None:
     return dict(row) if row else None
 
 
+def set_session_goal(sid: str, goal: str, db_path: str | Path | None = None) -> bool:
+    """Set the original session goal once; later question changes belong in the journal."""
+    goal = str(goal).strip()[:1000]
+    if not goal:
+        return False
+    with _connect(db_path) as conn:
+        row = conn.execute("SELECT goal FROM sessions WHERE sid=?", (sid,)).fetchone()
+        if row is None or row["goal"]:
+            return False
+        conn.execute("UPDATE sessions SET goal=? WHERE sid=?", (goal, sid))
+    return True
+
+
 def get_session_by_file(file: str, db_path: str | Path | None = None) -> dict | None:
     path = str(Path(file).expanduser().resolve())
     with _connect(db_path) as conn:

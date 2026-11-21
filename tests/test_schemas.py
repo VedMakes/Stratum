@@ -35,3 +35,9 @@ def test_drift_schemas_expose_monitoring_thresholds():
     for name in ("stratum_drift", "stratum_drift_current"):
         properties = schemas[name]["inputSchema"]["properties"]
         assert {"psi_mild_threshold", "psi_significant_threshold", "psi_high_threshold", "p_value_threshold"} <= set(properties)
+
+
+def test_profile_schema_can_capture_concise_local_question_context():
+    schema = next(tool for tool in ALL_TOOLS if tool["name"] == "stratum_profile")
+    assert "goal" in schema["inputSchema"]["properties"]
+    assert "conversation transcript" in schema["description"]
