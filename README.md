@@ -122,6 +122,14 @@ The stdio setup is covered by a subprocess smoke test that completes MCP
 initialization and lists the registered tools. CI runs this handshake against
 the installed package.
 
+## Optional Agent Skill
+
+The repository includes `skills/stratum-ml-workflow/SKILL.md`, a portable
+Agent Skill that guides compatible agents through Stratum's existing tools,
+decision gates, and evidence-based handoffs. It is optional and is not installed
+or activated by `pip install`; load the skill directory using your agent's
+documented skill mechanism. The skill does not replace code-enforced guardrails.
+
 If your client does not inherit the virtualenv `PATH`, use the absolute script
 path instead, for example:
 

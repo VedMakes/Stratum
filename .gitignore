@@ -39,6 +39,7 @@ ENV/
 .agents
 .codex
 Stratum_Engineering_Roadmap_Agent_Guideline.docx
+Stratum_Companion_Development_Plan.md
 
 # IDE and editor state
 .idea/
