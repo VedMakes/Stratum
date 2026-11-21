@@ -191,3 +191,22 @@ def test_agent_workflow_and_direct_guardrail_bypasses(tmp_path, monkeypatch):
     assert status["runs"][0]["baseline_comparison"]["metric"] == "accuracy"
     assert status["blocking_decisions"] == []
     assert status["recent_journal"]
+
+
+def test_association_is_available_through_mcp_dispatch(tmp_path):
+    data_path = tmp_path / "association.csv"
+    pd.DataFrame({
+        "signal": range(20),
+        "outcome": [0] * 10 + [1] * 10,
+    }).to_csv(data_path, index=False)
+
+    result = asyncio.run(dispatch_tool("stratum_association", {
+        "file": str(data_path),
+        "outcome": "outcome",
+        "positive_label": "1",
+        "features": ["signal"],
+        "bootstrap_samples": 100,
+    }))
+
+    assert "error" not in result
+    assert result["results"][0]["effect_name"] == "cliffs_delta"

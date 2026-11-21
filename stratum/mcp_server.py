@@ -12,6 +12,7 @@ from typing import Any
 
 from .schemas import ALL_TOOLS
 from .tools.tool_audit import run_audit
+from .tools.tool_association import run_association
 from .tools.tool_compare import run_compare
 from .tools.tool_contamination import run_contamination
 from .tools.tool_decisions import (
@@ -50,6 +51,7 @@ HANDLERS = {
     "stratum_drift": run_drift,
     "stratum_drift_current": run_drift_current,
     "stratum_audit": run_audit,
+    "stratum_association": run_association,
     "stratum_leakage_deep": run_leakage_deep,
     "stratum_label_quality": run_label_quality,
     "stratum_contamination": run_contamination,

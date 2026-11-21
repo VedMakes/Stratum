@@ -23,6 +23,15 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--target", required=True)
     audit.add_argument("--sid")
 
+    association = commands.add_parser("association", help="Analyze selected features against a binary outcome.")
+    association.add_argument("file")
+    association.add_argument("--outcome", required=True)
+    association.add_argument("--positive-label", required=True)
+    association.add_argument("--feature", action="append", dest="features", required=True)
+    association.add_argument("--sid")
+    association.add_argument("--bootstrap-samples", type=int, default=1000)
+    association.add_argument("--seed", type=int, default=42)
+
     split = commands.add_parser("split", help="Create a persisted train/test split.")
     split.add_argument("file")
     split.add_argument("--target", required=True)
@@ -92,6 +101,13 @@ def _execute(args: argparse.Namespace) -> dict:
         from .tools.tool_audit import run_audit
 
         return run_audit(args.file, args.target, sid=args.sid)
+    if args.command == "association":
+        from .tools.tool_association import run_association
+
+        return run_association(
+            args.file, args.outcome, args.positive_label, args.features,
+            sid=args.sid, bootstrap_samples=args.bootstrap_samples, seed=args.seed,
+        )
     if args.command == "split":
         from .data.splitter import run_split
 

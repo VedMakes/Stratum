@@ -56,6 +56,24 @@ def test_cli_drift_forwards_configured_thresholds(tmp_path, capsys):
     assert response["actionable_findings"]
 
 
+def test_cli_association_requires_and_forwards_selected_features(tmp_path, capsys):
+    data = tmp_path / "association.csv"
+    pd.DataFrame({
+        "x": list(range(20)),
+        "outcome": [0] * 10 + [1] * 10,
+    }).to_csv(data, index=False)
+
+    result = main([
+        "association", str(data), "--outcome", "outcome", "--positive-label", "1",
+        "--feature", "x", "--bootstrap-samples", "100",
+    ])
+    response = json.loads(capsys.readouterr().out)
+
+    assert result == 0
+    assert response["features"] == ["x"]
+    assert response["results"][0]["effect_name"] == "cliffs_delta"
+
+
 def test_cli_returns_nonzero_for_tool_errors(tmp_path, capsys):
     result = main(["validate", "missing-model", str(tmp_path / "missing.csv")])
 

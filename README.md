@@ -197,6 +197,13 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
 2. Profile and contract the dataset with `stratum_profile`.
 3. Audit data risks with `stratum_audit`, `stratum_leakage_deep`,
    `stratum_label_quality`, `stratum_join_check`, and `stratum_schema_check`.
+   For a specific binary-outcome question, use `stratum_association` only after
+   choosing the positive label and 1-10 relevant features. Numeric features use
+   Cliff's delta; categorical features use Cramer's V. Results include
+   bootstrap intervals, support, missing-row counts, and Benjamini-Hochberg
+   adjusted p-values. These are observational associations, not causal effects
+   or evidence that a feature is available at prediction time. The tool does
+   not scan every column automatically.
 4. Use `stratum_next_action`, `stratum_decisions`, `stratum_create_decision`, and
    `stratum_resolve_decision` when the agent needs user judgement.
 5. Choose a split with `stratum_split` (`random`, `stratified`, `group`,
@@ -264,6 +271,7 @@ Data and guardrail tools:
 Modelling and analysis tools:
 
 - `stratum_engineer`
+- `stratum_association`
 - `stratum_train`
 - `stratum_validate`
 - `stratum_segments`
@@ -276,6 +284,17 @@ Modelling and analysis tools:
 - `stratum_report`
 
 ## Direct MLProj Usage
+
+Run the same selected-feature association analysis from the CLI:
+
+```bash
+stratum association customers.csv --outcome churn --positive-label 1 \
+  --feature tenure_months --feature support_calls
+```
+
+The MCP tool accepts the same inputs as `file`, `outcome`, `positive_label`,
+and a list of selected `features`. Each result is saved as a
+`statistical_analysis` session artifact and included in `stratum_report`.
 
 MLProj gives the local modelling layer a stable Python API. Use it directly when
 you want ordinary script/notebook control without the MCP loop.

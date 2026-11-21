@@ -21,7 +21,7 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
     artifacts = get_artifacts(status["sid"])
     latest = _latest_by_kind(artifacts, {
         "data_contract", "split_manifest", "schema_check", "audit", "leakage_deep",
-        "label_quality", "join_check", "validation", "segment_analysis",
+        "label_quality", "join_check", "statistical_analysis", "validation", "segment_analysis",
         "group_evaluation", "stability", "drift_monitoring", "predictions_csv",
         "export_script",
     })

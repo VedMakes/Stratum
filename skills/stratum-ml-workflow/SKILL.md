@@ -27,6 +27,11 @@ your behavior; Stratum code, not these instructions, enforces critical gates.
   `stratum_label_quality`, `stratum_schema_check`, or `stratum_join_check` when
   the question and data warrant them; these tools have different inputs, so
   follow their schemas.
+- For a specific binary-outcome relationship, clarify the positive label and
+  select only the relevant 1-10 features before calling `stratum_association`.
+  Explain effect direction/strength, intervals, support, and adjusted p-values.
+  These are observational associations, not causal effects or proof of
+  prediction-time availability.
 - Summarize findings in plain language and distinguish observed evidence from
   hypotheses that need user confirmation.
 - Do not send raw rows or sensitive values to an external service. LLM-backed
