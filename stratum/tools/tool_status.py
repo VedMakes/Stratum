@@ -84,17 +84,23 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
     runs = get_session_runs(sid)
     artifacts = get_artifacts(sid)
     best = _best_run(runs)
-    baseline = runs[0] if runs else None
     best_metric, best_value, best_direction = _primary_metric(best) if best else (None, None, "maximize")
-    baseline_metric, baseline_value, _ = (
-        _primary_metric(baseline) if baseline else (None, None, "maximize")
-    )
-    comparable = (
-        best_metric is not None
-        and best_metric == baseline_metric
-        and best_value is not None
-        and baseline_value is not None
-    )
+    evaluation = (best or {}).get("evaluation") or {}
+    baseline_metrics = (evaluation.get("baseline") or {}).get("metrics") or {}
+    baseline_value = baseline_metrics.get(best_metric) if best_metric else None
+    baseline_source = "evaluation_baseline" if baseline_value is not None else None
+
+    if baseline_value is None:
+        prior_runs = [run for run in runs if run.get("model_id") != (best or {}).get("model_id")]
+        baseline = prior_runs[0] if prior_runs else None
+        baseline_metric, baseline_value, _ = (
+            _primary_metric(baseline) if baseline else (None, None, "maximize")
+        )
+        if baseline_metric != best_metric:
+            baseline_value = None
+        elif baseline is not None:
+            baseline_source = "prior_run"
+    comparable = best_metric is not None and best_value is not None and baseline_value is not None
     improvement = None
     if comparable:
         delta = best_value - baseline_value
@@ -139,5 +145,6 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
         "current_score": best_value,
         "baseline_score": baseline_value if comparable else None,
         "improvement": improvement,
+        "baseline_source": baseline_source if comparable else None,
         "artifacts": artifacts,
     })

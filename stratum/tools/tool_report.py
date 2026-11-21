@@ -57,6 +57,7 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
         "current_score": status["current_score"],
         "baseline_score": status["baseline_score"],
         "improvement": status["improvement"],
+        "baseline_source": status["baseline_source"],
         "runs": status["runs"],
         "resolved_flags": status["resolved_flags"],
         "flags": get_flags(status["sid"]),

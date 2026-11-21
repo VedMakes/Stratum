@@ -12,6 +12,7 @@ from stratum.session import (
 )
 from stratum.provenance import artifact_record, environment_snapshot
 from stratum.tools.tool_predict import run_predict
+from stratum.tools.tool_report import run_report
 from stratum.tools.tool_status import _best_run, _primary_metric, run_status
 
 
@@ -48,12 +49,13 @@ def test_status_ranks_runs_by_latest_saved_selection_objective():
     assert _best_run([accuracy_run, f1_run]) is f1_run
 
 
-def _save_model_run(tmp_path, sid, model_id, accuracy):
+def _save_model_run(tmp_path, sid, model_id, accuracy, evaluation=None):
     artifact_path = tmp_path / f"{model_id}.joblib"
     joblib.dump(TinyClassifier(), artifact_path)
     save_run(sid, model_id, Result(), {"accuracy": accuracy}, metadata={
         "model_name": "tiny",
         "task": "classification",
+        "evaluation": evaluation or {},
         "feature_names": ["score"],
         "feature_dtypes": {"score": "float64"},
         "artifact_path": str(artifact_path),
@@ -166,3 +168,22 @@ def test_status_summarises_session_by_sid_or_file(tmp_path):
         "support_tickets_per_month", "days_since_last_login"
     ]
     assert by_sid["resolved_flags"][0]["user_comment"] == "recorded at signup"
+
+
+def test_status_uses_training_evaluation_baseline_for_single_run(tmp_path):
+    sid = create_session(str(tmp_path / "train.csv"), "target")
+    evaluation = {
+        "baseline": {"name": "prior_dummy", "metrics": {"accuracy": .57}},
+    }
+    _save_model_run(tmp_path, sid, "run_with_baseline", .86, evaluation=evaluation)
+
+    status = run_status(sid=sid)
+
+    assert status["best_model"] == "run_with_baseline"
+    assert status["current_score"] == .86
+    assert status["baseline_score"] == .57
+    assert round(status["improvement"], 2) == .29
+    assert status["baseline_source"] == "evaluation_baseline"
+    report = run_report(sid=sid)
+    assert report["baseline_score"] == .57
+    assert report["baseline_source"] == "evaluation_baseline"
