@@ -16,10 +16,9 @@ It ships with **MLProj**, a small modular statistical modelling library. Stratum
 uses MLProj under the hood for model wrappers, tuning, scoring, feature
 importance, and fitted artifacts; you can also use MLProj directly from Python.
 
-**In a hurry?** Start with [Install](#install), then choose the
-[MCP agent workflow](#mcp-setup) or [Python library](#direct-mlproj-usage).
-New to the project? Read [What You Get](#what-you-get), then try the
-[CLI Quickstart](#cli-quickstart) with the included synthetic example.
+**New here?** Follow [Quick Setup](#quick-setup) to install and try the included
+example. Then connect an [MCP agent](#mcp-setup), or use the
+[Python library](#direct-mlproj-usage) directly.
 
 **Tags:** `Python` `MCP` `tabular ML` `statistical modeling` `scikit-learn`
 `pandas` `local-first` `agent skills`
@@ -38,20 +37,9 @@ New to the project? Read [What You Get](#what-you-get), then try the
 
 ## Install
 
-Stratum requires Python 3.12 or newer.
-
-```bash
-git clone https://github.com/VedMakes/Stratum
-cd Stratum
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install -e ".[stratum,test]"
-python -m pytest
-```
-
-Windows PowerShell activation uses `.venv\Scripts\Activate.ps1`. These
-commands install the MCP server and test dependencies into the active
-environment; optional boosters and LLM providers are installed separately.
+Stratum requires Python 3.12 or newer. For a guided install and first run,
+follow [Quick Setup](#quick-setup). Optional model boosters and LLM providers
+are not needed for the core workflow.
 
 Smoke-check the MCP entrypoint:
 
@@ -81,6 +69,46 @@ The built-in `auto` model selection only uses models available in the current
 environment. An explicitly selected optional model reports which extra to
 install when its dependency is missing.
 
+## Quick Setup
+
+You need Git and Python 3.12 or newer. Open a terminal and run:
+
+```bash
+git clone https://github.com/VedMakes/Stratum.git
+cd Stratum
+python -m venv .venv
+```
+
+Activate the environment and install Stratum with its MCP support:
+
+```bash
+# macOS / Linux
+source .venv/bin/activate
+python -m pip install -e ".[stratum]"
+```
+
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[stratum]"
+```
+
+Try profiling the included toy dataset:
+
+```bash
+stratum profile examples/churn.csv --target churn
+```
+
+The command prints JSON including a session ID (`sid`). This confirms the local
+CLI and data access work. The example is synthetic and intentionally small; it
+is for learning the workflow, not judging model quality. To run the test suite
+as well, install the test extra and execute pytest:
+
+```bash
+python -m pip install -e ".[stratum,test]"
+python -m pytest
+```
+
 ## CLI Quickstart
 
 The CLI provides direct local access to the same profiling, audit, split,
@@ -88,22 +116,26 @@ training, validation, reporting, and artifact workflows. This synthetic example
 contains no real customer data and is intentionally tiny; its model metrics are
 not evidence of useful generalization:
 
+Run each step and copy the IDs printed in the JSON response into the next
+command. First profile the data, then audit it using the returned `sid`:
+
 ```bash
 stratum profile examples/churn.csv --target churn
-stratum audit examples/churn.csv --target churn --sid YOUR_SID
-stratum split examples/churn.csv --target churn --mode stratified --sid YOUR_SID
+stratum audit examples/churn.csv --target churn --sid PASTE_SID_HERE
 ```
 
-Each command prints JSON. Reuse the returned `sid`; pass the split command's
-`split_id` to training so the model uses exactly those saved partitions:
+Then make a stratified split. Use the resulting `sid` and `split_id` to train;
+this ensures training uses the exact saved partitions:
 
 ```bash
-stratum train examples/churn.csv --target churn --model logistic_regression \\
-  --task classification --sid YOUR_SID --split-id YOUR_SPLIT_ID
-stratum validate YOUR_MODEL_ID examples/churn.csv --target churn --sid YOUR_SID
-stratum report --sid YOUR_SID --format html --output session-report.html
-stratum artifacts --sid YOUR_SID
+stratum split examples/churn.csv --target churn --mode stratified --sid PASTE_SID_HERE
+stratum train examples/churn.csv --target churn --model logistic_regression --task classification --sid PASTE_SID_HERE --split-id PASTE_SPLIT_ID_HERE
+stratum report --sid PASTE_SID_HERE --format html --output session-report.html
 ```
+
+Replace each `PASTE_..._HERE` placeholder with the matching value from the
+previous command's JSON. With only 32 synthetic rows, the holdout is tiny; do
+not interpret its scores as evidence that a model will work on real data.
 
 For monitoring against the immutable training-time feature summary saved with
 the model, use:
@@ -139,6 +171,18 @@ Config keys and file locations vary by MCP client. If the client cannot find
 the command, use the absolute executable path shown below, reload the client,
 and confirm Stratum's tools are listed. Begin with `stratum_profile` on a local
 CSV, using the [Agent Workflow](#agent-workflow) as a guide.
+
+Once connected, try asking your agent:
+
+> Use Stratum to inspect `examples/churn.csv` and explain what it can tell me.
+> This is a tiny synthetic example. Do not train a model unless I ask.
+
+If the agent says the Stratum tools are unavailable, check that the MCP client
+uses the same Python environment where you installed Stratum. You can avoid
+PATH issues by setting `command` to the full path of `.venv/bin/stratum-mcp`
+(macOS/Linux) or `.venv\Scripts\stratum-mcp.exe` (Windows), then restart the
+client. MCP configuration formats differ, so use the client's own instructions
+for where to put the JSON snippet.
 
 The stdio setup is covered by a subprocess smoke test that completes MCP
 initialization and lists the registered tools. CI runs this handshake against
@@ -269,36 +313,6 @@ Blocking decisions must declare `safe_answers`. A recommendation is not a user
 decision: only an answer explicitly listed as safe clears the workflow gate.
 Unknown, deferred, and unsafe answers remain visible and keep training,
 prediction, and export blocked until the decision is safely resolved.
-
-## Independent Domain Review
-
-Use an independent reviewer to assess whether Stratum's analysis and handoff
-fit the real decision context. This differs from checking that the tools run.
-The included `examples/churn.csv` is synthetic and tiny: it is suitable for
-testing setup and interaction only, not domain correctness, business value, or
-model generalization.
-
-For a real review, use data approved for that purpose and ask a domain-informed
-reviewer who did not operate the agent to inspect the report and supporting
-evidence. Agree on these facts before analysis: what one row represents, the
-target and outcome horizon, when a prediction would be made, and which fields
-are genuinely available at that time. Then assess whether:
-
-- The target, prediction timing, and split design match the intended use.
-- Leakage, missingness, class support, uncertainty, and relevant subgroups are
-  clear and not understated.
-- Baselines and metrics answer the stated decision question.
-- Recommendations cite saved evidence, state trade-offs, and remain
-  recommendations rather than being treated as user approval.
-- Another person can trace the question, assumptions, decisions, data, split,
-  model, and limitations from the report.
-
-Log disagreements with supporting evidence and severity; reproduce software
-defects before changing behavior. One review identifies issues, not universal
-correctness. A lightweight review record should capture the question,
-dataset/version, target and prediction time, reviewer role, findings, severity,
-evidence, and follow-up outcome. Keep sensitive data local and follow your
-organization's access and retention rules.
 
 ## MCP Tool Map
 
