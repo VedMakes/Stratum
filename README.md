@@ -206,6 +206,9 @@ SQLite; on POSIX systems, the database file is restricted to the current OS user
    not scan every column automatically.
 4. Use `stratum_next_action`, `stratum_decisions`, `stratum_create_decision`, and
    `stratum_resolve_decision` when the agent needs user judgement.
+   After a saved run, `stratum_recommend` can summarize evidence-linked next
+   steps. Recommendations are not user decisions and never execute experiments;
+   ask before changing features, metric, or evaluation protocol.
 5. Choose a split with `stratum_split` (`random`, `stratified`, `group`,
    `temporal`, or `predefined`; temporal splits also support a row gap), then
    check contamination with `stratum_contamination`. Group splits keep groups
@@ -272,6 +275,7 @@ Modelling and analysis tools:
 
 - `stratum_engineer`
 - `stratum_association`
+- `stratum_recommend`
 - `stratum_train`
 - `stratum_validate`
 - `stratum_segments`
@@ -295,6 +299,14 @@ stratum association customers.csv --outcome churn --positive-label 1 \
 The MCP tool accepts the same inputs as `file`, `outcome`, `positive_label`,
 and a list of selected `features`. Each result is saved as a
 `statistical_analysis` session artifact and included in `stratum_report`.
+Inspect next-step suggestions from saved evidence with:
+
+```bash
+stratum recommend --sid SESSION_ID
+```
+
+Alternatively, use `--file customers.csv`. This records the recommendations,
+not an approval or experiment.
 
 MLProj gives the local modelling layer a stable Python API. Use it directly when
 you want ordinary script/notebook control without the MCP loop.

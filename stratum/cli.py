@@ -73,6 +73,10 @@ def _parser() -> argparse.ArgumentParser:
     drift_current.add_argument("--sid")
     _add_drift_thresholds(drift_current)
 
+    recommend = commands.add_parser("recommend", help="Recommend next steps from saved session evidence.")
+    recommend.add_argument("--sid")
+    recommend.add_argument("--file")
+
     report = commands.add_parser("report", help="Generate a JSON or HTML session report.")
     report.add_argument("--sid")
     report.add_argument("--file")
@@ -147,6 +151,10 @@ def _execute(args: argparse.Namespace) -> dict:
             psi_high_threshold=args.psi_high_threshold,
             p_value_threshold=args.p_value_threshold,
         )
+    if args.command == "recommend":
+        from .tools.tool_recommend import run_recommend
+
+        return run_recommend(sid=args.sid, file=args.file)
     if args.command == "report":
         from .tools.tool_report import run_report
 

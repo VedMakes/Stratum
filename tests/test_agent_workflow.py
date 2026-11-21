@@ -210,3 +210,17 @@ def test_association_is_available_through_mcp_dispatch(tmp_path):
 
     assert "error" not in result
     assert result["results"][0]["effect_name"] == "cliffs_delta"
+
+
+def test_recommendations_are_available_through_mcp_dispatch(tmp_path):
+    from stratum.session import create_session
+
+    data_path = tmp_path / "recommend.csv"
+    pd.DataFrame({"x": [0, 1], "outcome": [0, 1]}).to_csv(data_path, index=False)
+    sid = create_session(str(data_path), "outcome")
+
+    result = asyncio.run(dispatch_tool("stratum_recommend", {"sid": sid}))
+
+    assert result["sid"] == sid
+    assert result["recommendations"] == []
+    assert result["recommendations_are_not_decisions"] is True

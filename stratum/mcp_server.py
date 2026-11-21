@@ -33,6 +33,7 @@ from .tools.tool_label_quality import run_label_quality
 from .tools.tool_leakage_deep import run_leakage_deep
 from .tools.tool_predict import run_predict
 from .tools.tool_profile import run_profile
+from .tools.tool_recommend import run_recommend
 from .tools.tool_report import run_report
 from .tools.tool_schema_check import run_schema_check
 from .tools.tool_segments import run_segments
@@ -52,6 +53,7 @@ HANDLERS = {
     "stratum_drift_current": run_drift_current,
     "stratum_audit": run_audit,
     "stratum_association": run_association,
+    "stratum_recommend": run_recommend,
     "stratum_leakage_deep": run_leakage_deep,
     "stratum_label_quality": run_label_quality,
     "stratum_contamination": run_contamination,

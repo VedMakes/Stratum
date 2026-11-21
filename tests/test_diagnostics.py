@@ -12,6 +12,7 @@ from stratum.tools.tool_stability import run_stability
 from stratum.tools.tool_validate import run_validate
 from stratum.tools.eval_common import classification_metrics
 from stratum.tools.eval_common import evaluation_warnings, residual_summary
+from stratum.data.splitter import file_sha256
 
 
 class Result:
@@ -76,6 +77,8 @@ def test_validate_returns_metrics_and_confusion_matrix(tmp_path):
     assert "brier_score" in result["metrics"]
     assert result["confusion_matrix"]["labels"] == ["0", "1"]
     assert result["calibration_bins"]
+    validation_artifact = get_artifacts(sid, "validation")[-1]
+    assert validation_artifact["metadata"]["source_sha256"] == file_sha256(str(data))
 
 
 def test_probability_metrics_support_string_classes():

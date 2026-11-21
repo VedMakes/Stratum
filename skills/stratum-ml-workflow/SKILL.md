@@ -75,6 +75,11 @@ your behavior; Stratum code, not these instructions, enforces critical gates.
 - Use `stratum_report` to preserve the session summary. Include the important
   assumptions, decisions, split protocol, baseline comparison, warnings, and
   limitations in your conversational handoff.
+- After a saved run, use `stratum_recommend` to ground proposed next steps in
+  saved evidence. Explain the cited run/artifact, trade-off, and what would
+  change the suggestion. Recommendations are not user choices; ask and record
+  a decision before changing a metric, feature set, split design, or launching
+  a materially different experiment.
 - Feature drift from `stratum_drift` or `stratum_drift_current` is not label
   shift or model-performance evaluation. Recommend labeled validation when
   performance is the concern.

@@ -74,6 +74,13 @@ def test_cli_association_requires_and_forwards_selected_features(tmp_path, capsy
     assert response["results"][0]["effect_name"] == "cliffs_delta"
 
 
+def test_cli_recommend_requires_an_existing_session(tmp_path, capsys):
+    result = main(["recommend", "--file", str(tmp_path / "missing.csv")])
+    response = json.loads(capsys.readouterr().out)
+    assert result == 1
+    assert "Session not found" in response["error"]
+
+
 def test_cli_returns_nonzero_for_tool_errors(tmp_path, capsys):
     result = main(["validate", "missing-model", str(tmp_path / "missing.csv")])
 

@@ -126,6 +126,10 @@ def run_status(sid: str | None = None, file: str | None = None) -> dict:
             "top_features": run.get("top_features") or [],
             "decision_tree_summary": run.get("decision_tree_summary") or "",
             "preprocessing": run.get("preprocessing") or {},
+            "dataset_path": run.get("dataset_path") or "",
+            "dataset_rows": (run.get("provenance") or {}).get("dataset", {}).get("rows"),
+            "dataset_sha256": (run.get("provenance") or {}).get("dataset", {}).get("sha256"),
+            "split_strategy": (run.get("split_metadata") or {}).get("strategy"),
         }
         if metric:
             compact[metric] = value

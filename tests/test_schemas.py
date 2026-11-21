@@ -5,7 +5,7 @@ from stratum.schemas import ALL_TOOLS
 
 def test_schemas_are_compressed():
     encoded = json.dumps(ALL_TOOLS)
-    assert len(ALL_TOOLS) == 29
+    assert len(ALL_TOOLS) == 30
     assert len(encoded) / 4 < 8500
 
 

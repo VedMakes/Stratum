@@ -22,7 +22,8 @@ def run_report(sid: str | None = None, file: str | None = None) -> dict:
     latest = _latest_by_kind(artifacts, {
         "data_contract", "split_manifest", "schema_check", "audit", "leakage_deep",
         "label_quality", "join_check", "statistical_analysis", "validation", "segment_analysis",
-        "group_evaluation", "stability", "drift_monitoring", "predictions_csv",
+        "group_evaluation", "stability", "experiment_recommendations",
+        "drift_monitoring", "predictions_csv",
         "export_script",
     })
     diagnostics = {

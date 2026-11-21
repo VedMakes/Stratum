@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..common import json_safe
+from ..data.splitter import file_sha256
 from ..session import save_artifact
 from .eval_common import (
     calibration_bins,
@@ -62,6 +63,8 @@ def run_validate(
             "rows_evaluated": len(df),
             "metrics": metrics,
             "target": result["target"],
+            "source_sha256": file_sha256(file),
+            "warnings": result["warnings"],
         },
     )
     return json_safe(result)
