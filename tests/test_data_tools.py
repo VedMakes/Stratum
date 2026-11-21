@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from stratum.data.drift import compute_psi, run_drift
+from stratum.data.drift import compute_psi, run_drift, run_drift_profile
 from stratum.data.profiler import run_profile
 from stratum.data.splitter import run_split
+from stratum.provenance import build_drift_reference
 from stratum.session import get_artifacts
 
 
@@ -246,4 +247,60 @@ def test_drift_warns_on_dataset_size_disparity(tmp_path):
     result = run_drift(str(ref_path), str(cur_path), target="target")
     assert result["warnings"]
     assert "Dataset sizes differ significantly" in result["warnings"][0]
-    assert result["note"] == "Target column excluded. Label shift detection requires separate analysis."
+    assert "label shift" in result["note"]
+
+
+def test_drift_exposes_thresholds_actions_and_persists_monitor_result(tmp_path):
+    reference = pd.DataFrame({"x": range(100)})
+    current = pd.DataFrame({"x": range(100, 200)})
+    ref_path, cur_path = tmp_path / "ref.csv", tmp_path / "cur.csv"
+    reference.to_csv(ref_path, index=False)
+    current.to_csv(cur_path, index=False)
+
+    result = run_drift(
+        str(ref_path), str(cur_path), psi_mild_threshold=.05,
+        psi_significant_threshold=.1, psi_high_threshold=.2,
+    )
+
+    assert result["thresholds"]["psi_significant"] == .1
+    assert result["actionable_findings"][0]["column"] == "x"
+    assert result["actionable_findings"][0]["severity"] == "critical"
+    assert result["artifact_id"]
+    artifact = get_artifacts(result["sid"], "drift_monitoring")[-1]
+    assert artifact["metadata"]["psi_max"] == result["psi_max"]
+
+
+def test_training_profile_drift_finds_unseen_categories_and_missing_features(tmp_path):
+    from stratum.session import create_session
+
+    reference = pd.DataFrame({"segment": ["a"] * 50 + ["b"] * 50, "age": range(100)})
+    profile = {
+        "rows": len(reference),
+        "features": build_drift_reference(reference, ["segment", "age"]),
+    }
+    current = pd.DataFrame({"segment": ["new"] * 100})
+    path = tmp_path / "current_profile.csv"
+    current.to_csv(path, index=False)
+    sid = create_session(str(path), "target")
+
+    result = run_drift_profile(profile, str(path), sid=sid, model_id="profiled-model")
+
+    assert result["reference_kind"] == "training_time_feature_summary"
+    assert result["columns"][0]["psi"] > .5
+    assert any("not seen" in warning for warning in result["warnings"])
+    assert result["columns"][1]["missing_feature"] is True
+    assert result["overall_verdict"] == "significant_drift"
+    assert get_artifacts(sid, "drift_monitoring")[-1]["model_id"] == "profiled-model"
+
+
+def test_drift_rejects_incoherent_thresholds(tmp_path):
+    ref_path, cur_path = tmp_path / "ref.csv", tmp_path / "cur.csv"
+    pd.DataFrame({"x": [1, 2]}).to_csv(ref_path, index=False)
+    pd.DataFrame({"x": [2, 3]}).to_csv(cur_path, index=False)
+
+    result = run_drift(
+        str(ref_path), str(cur_path), psi_mild_threshold=.2,
+        psi_significant_threshold=.1,
+    )
+
+    assert "must satisfy" in result["error"]

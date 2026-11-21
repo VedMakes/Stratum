@@ -42,6 +42,7 @@ jobs:
         run: |
           stratum-mcp --help
           stratum-mcp --version
+          stratum --help
 
       - name: Run tests
         run: python -m pytest

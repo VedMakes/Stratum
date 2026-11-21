@@ -80,6 +80,7 @@ checkpoints/
 
 # Large tabular/intermediate files
 *.csv
+!/examples/churn.csv
 *.tsv
 *.parquet
 *.feather

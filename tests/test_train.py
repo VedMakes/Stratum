@@ -93,7 +93,7 @@ def test_train_uses_holdout_and_persists(binary_csv, monkeypatch):
     assert saved_run["evaluation"]["operational"]["training_wall_seconds"] >= 0
     assert saved_run["evaluation"]["operational"]["inference_timing"]["median_ms_per_row"] >= 0
     provenance = saved_run["provenance"]
-    assert provenance["schema_version"] == 1
+    assert provenance["schema_version"] == 2
     assert provenance["dataset"]["sha256"]
     assert provenance["dataset"]["frame_fingerprint"]
     assert provenance["dataset"]["columns"]["target"]["dtype"]

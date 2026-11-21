@@ -28,3 +28,10 @@ def test_group_evaluation_schema_requires_selected_group_column():
     schema = next(tool for tool in ALL_TOOLS if tool["name"] == "stratum_group_evaluation")
     assert schema["inputSchema"]["required"] == ["model_id", "file", "group_col"]
     assert "min_support" in schema["inputSchema"]["properties"]
+
+
+def test_drift_schemas_expose_monitoring_thresholds():
+    schemas = {tool["name"]: tool for tool in ALL_TOOLS}
+    for name in ("stratum_drift", "stratum_drift_current"):
+        properties = schemas[name]["inputSchema"]["properties"]
+        assert {"psi_mild_threshold", "psi_significant_threshold", "psi_high_threshold", "p_value_threshold"} <= set(properties)

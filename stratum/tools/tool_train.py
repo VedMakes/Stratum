@@ -362,6 +362,7 @@ def run_train(
         metrics=metrics,
         artifact_path=artifact_path,
         decision_ids=[decision["decision_id"] for decision in get_decisions(sid, status=None)],
+        drift_reference_df=X_train,
     )
     save_artifact(
         sid,

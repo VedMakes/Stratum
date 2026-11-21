@@ -2,6 +2,7 @@ import pandas as pd
 
 from stratum.data.profiler import run_profile
 from stratum.session import create_session, save_run
+from stratum.provenance import build_drift_reference
 from stratum.tools.tool_contamination import run_contamination
 from stratum.tools.tool_drift_current import run_drift_current
 from stratum.tools.tool_join_check import run_join_check
@@ -62,6 +63,35 @@ def test_drift_current_uses_model_training_path(tmp_path):
 
     assert result["model_id"] == "run_drift_ref"
     assert result["top_drifted"][0] == "age"
+
+
+def test_drift_current_uses_immutable_training_profile_after_source_changes(tmp_path):
+    original = pd.DataFrame({"age": range(60), "target": [0, 1] * 30})
+    source = tmp_path / "training.csv"
+    current = tmp_path / "current.csv"
+    original.to_csv(source, index=False)
+    original[["age"]].to_csv(current, index=False)
+    sid = create_session(str(source), "target")
+    save_run(sid, "run_immutable_drift", Result(), {"accuracy": .8}, metadata={
+        "dataset_path": str(source),
+        "target_col": "target",
+        "feature_names": ["age"],
+        "provenance": {
+            "schema_version": 2,
+            "dataset": {
+                "drift_reference": {
+                    "rows": len(original),
+                    "features": build_drift_reference(original[["age"]], ["age"]),
+                },
+            },
+        },
+    })
+    pd.DataFrame({"age": range(1000, 1060), "target": [0, 1] * 30}).to_csv(source, index=False)
+
+    result = run_drift_current("run_immutable_drift", str(current), sid=sid)
+
+    assert result["reference_kind"] == "training_time_feature_summary"
+    assert result["overall_verdict"] == "no_drift"
 
 
 def test_contamination_detects_overlap_id_and_time(tmp_path):

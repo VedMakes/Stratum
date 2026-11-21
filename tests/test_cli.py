@@ -40,6 +40,22 @@ def test_cli_split_forwards_split_design(tmp_path, capsys):
     assert result["parameters"]["seed"] == 11
 
 
+def test_cli_drift_forwards_configured_thresholds(tmp_path, capsys):
+    reference, current = tmp_path / "reference.csv", tmp_path / "current.csv"
+    pd.DataFrame({"x": range(50)}).to_csv(reference, index=False)
+    pd.DataFrame({"x": range(100, 150)}).to_csv(current, index=False)
+
+    result = main([
+        "drift", str(reference), str(current), "--psi-mild-threshold", ".05",
+        "--psi-significant-threshold", ".1", "--psi-high-threshold", ".2",
+    ])
+    response = json.loads(capsys.readouterr().out)
+
+    assert result == 0
+    assert response["thresholds"]["psi_mild"] == .05
+    assert response["actionable_findings"]
+
+
 def test_cli_returns_nonzero_for_tool_errors(tmp_path, capsys):
     result = main(["validate", "missing-model", str(tmp_path / "missing.csv")])
 

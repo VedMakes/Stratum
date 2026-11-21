@@ -32,7 +32,7 @@ git clone https://github.com/VedMakes/Stratum
 cd Stratum
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install -e ".[test]"
+python -m pip install -e ".[stratum,test]"
 python -m pytest
 ```
 
@@ -48,6 +48,61 @@ For only the core ML library, install without extras:
 ```bash
 python -m pip install -e .
 ```
+
+The `stratum` extra installs the MCP adapter; the command-line workflow uses
+the core dependencies. Optional model and analysis integrations are separate:
+
+```bash
+python -m pip install -e ".[catboost]"       # or .[lightgbm], .[xgboost]
+python -m pip install -e ".[boosters]"       # all three optional boosters
+python -m pip install -e ".[smote]"
+python -m pip install -e ".[visualization]"
+python -m pip install -e ".[stratum,llm-openai]"  # MCP plus OpenAI-backed tools
+```
+
+The built-in `auto` model selection only uses models available in the current
+environment. An explicitly selected optional model reports which extra to
+install when its dependency is missing.
+
+## CLI Quickstart
+
+The CLI provides direct local access to the same profiling, audit, split,
+training, validation, reporting, and artifact workflows. This synthetic example
+contains no real customer data and is intentionally tiny; its model metrics are
+not evidence of useful generalization:
+
+```bash
+stratum profile examples/churn.csv --target churn
+stratum audit examples/churn.csv --target churn --sid YOUR_SID
+stratum split examples/churn.csv --target churn --mode stratified --sid YOUR_SID
+```
+
+Each command prints JSON. Reuse the returned `sid`; pass the split command's
+`split_id` to training so the model uses exactly those saved partitions:
+
+```bash
+stratum train examples/churn.csv --target churn --model logistic_regression \\
+  --task classification --sid YOUR_SID --split-id YOUR_SPLIT_ID
+stratum validate YOUR_MODEL_ID examples/churn.csv --target churn --sid YOUR_SID
+stratum report --sid YOUR_SID --format html --output session-report.html
+stratum artifacts --sid YOUR_SID
+```
+
+For monitoring against the immutable training-time feature summary saved with
+the model, use:
+
+```bash
+stratum drift-current YOUR_MODEL_ID new_customers.csv --sid YOUR_SID
+```
+
+Or compare two explicit CSV files with `stratum drift reference.csv current.csv`.
+Both drift commands accept `--psi-mild-threshold`,
+`--psi-significant-threshold`, `--psi-high-threshold`, and
+`--p-value-threshold`. Drift reports describe feature-distribution change, not
+target/label shift or model performance. P-values are unadjusted for multiple
+comparisons, and drift findings are prompts to investigate and validate on
+labeled current data, not automatic retraining decisions. Older runs without a
+stored training-time profile require an explicit reference CSV.
 
 ## MCP Setup
 
@@ -352,6 +407,13 @@ configured session database after preserving anything you need.
 Run the suite with:
 
 ```bash
+python -m pytest
+```
+
+For the broader optional-dependency test environment:
+
+```bash
+python -m pip install -e ".[stratum,test,boosters,smote,visualization]"
 python -m pytest
 ```
 

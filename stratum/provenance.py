@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import importlib.metadata
 import hmac
+import hashlib
 import platform
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from .data.splitter import file_sha256, frame_fingerprint
 
 
-PROVENANCE_SCHEMA_VERSION = 1
+PROVENANCE_SCHEMA_VERSION = 2
 ARTIFACT_SCHEMA_VERSION = 1
 
 METRIC_DEFINITIONS = {
@@ -60,12 +62,53 @@ def artifact_record(path: str | Path) -> dict:
     }
 
 
+def category_fingerprint(value: object) -> str:
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()
+
+
+def build_drift_reference(df: pd.DataFrame, feature_names: list[str]) -> dict:
+    reference = {}
+    for name in feature_names:
+        series = df[name]
+        if pd.api.types.is_numeric_dtype(series):
+            values = pd.to_numeric(series, errors="coerce")
+            clean = values.dropna().to_numpy(dtype=float)
+            boundaries = (
+                np.unique(np.quantile(clean, np.linspace(.1, .9, 9))).tolist()
+                if len(clean) else []
+            )
+            counts = np.bincount(
+                np.searchsorted(boundaries, clean, side="right"),
+                minlength=len(boundaries) + 1,
+            )
+            reference[str(name)] = {
+                "type": "numeric",
+                "boundaries": [float(value) for value in boundaries],
+                "bin_counts": counts.astype(int).tolist(),
+                "missing_count": int(values.isna().sum()),
+                "count": int(len(series)),
+            }
+        else:
+            values = series.dropna().astype(str)
+            counts = values.value_counts()
+            top = counts.head(49)
+            reference[str(name)] = {
+                "type": "categorical",
+                "category_counts": {category_fingerprint(value): int(count) for value, count in top.items()},
+                "other_count": int(counts.iloc[49:].sum()),
+                "missing_count": int(series.isna().sum()),
+                "count": int(len(series)),
+                "other_key": "__stratum_other__",
+            }
+    return reference
+
+
 def verify_run_artifact(run: dict) -> dict:
     provenance = run.get("provenance") or {}
     record = provenance.get("artifact") or {}
     path = Path(run.get("artifact_path") or "").expanduser()
     if (
-        provenance.get("schema_version") != PROVENANCE_SCHEMA_VERSION
+        provenance.get("schema_version") not in {1, PROVENANCE_SCHEMA_VERSION}
         or record.get("schema_version") != ARTIFACT_SCHEMA_VERSION
         or not record.get("sha256")
     ):
@@ -112,6 +155,7 @@ def build_run_provenance(
     metrics: dict,
     artifact_path: str | Path,
     decision_ids: list[str],
+    drift_reference_df: pd.DataFrame | None = None,
 ) -> dict:
     source = Path(source_path).expanduser().resolve()
     artifact = Path(artifact_path)
@@ -125,6 +169,7 @@ def build_run_provenance(
         for column in df.columns
     }
     selection = training_policy.get("selection", {})
+    drift_frame = drift_reference_df if drift_reference_df is not None else df[feature_names]
     return {
         "schema_version": PROVENANCE_SCHEMA_VERSION,
         "dataset": {
@@ -133,6 +178,10 @@ def build_run_provenance(
             "frame_fingerprint": frame_fingerprint(df),
             "rows": int(len(df)),
             "columns": schema,
+            "drift_reference": {
+                "rows": int(len(drift_frame)),
+                "features": build_drift_reference(drift_frame, feature_names),
+            },
         },
         "target": target,
         "feature_names": list(feature_names),

@@ -51,6 +51,19 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--target")
     validate.add_argument("--sid")
 
+    drift = commands.add_parser("drift", help="Compare reference/current CSV feature distributions.")
+    drift.add_argument("reference")
+    drift.add_argument("current")
+    drift.add_argument("--target")
+    drift.add_argument("--sid")
+    _add_drift_thresholds(drift)
+
+    drift_current = commands.add_parser("drift-current", help="Monitor against a model's training-time feature profile.")
+    drift_current.add_argument("model_id")
+    drift_current.add_argument("file")
+    drift_current.add_argument("--sid")
+    _add_drift_thresholds(drift_current)
+
     report = commands.add_parser("report", help="Generate a JSON or HTML session report.")
     report.add_argument("--sid")
     report.add_argument("--file")
@@ -61,6 +74,13 @@ def _parser() -> argparse.ArgumentParser:
     artifacts.add_argument("--sid")
     artifacts.add_argument("--file")
     return parser
+
+
+def _add_drift_thresholds(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--psi-mild-threshold", type=float, default=.1)
+    parser.add_argument("--psi-significant-threshold", type=float, default=.2)
+    parser.add_argument("--psi-high-threshold", type=float, default=.5)
+    parser.add_argument("--p-value-threshold", type=float, default=.05)
 
 
 def _execute(args: argparse.Namespace) -> dict:
@@ -91,6 +111,26 @@ def _execute(args: argparse.Namespace) -> dict:
         from .tools.tool_validate import run_validate
 
         return run_validate(args.model_id, args.file, target=args.target, sid=args.sid)
+    if args.command == "drift":
+        from .data.drift import run_drift
+
+        return run_drift(
+            args.reference, args.current, target=args.target, sid=args.sid,
+            psi_mild_threshold=args.psi_mild_threshold,
+            psi_significant_threshold=args.psi_significant_threshold,
+            psi_high_threshold=args.psi_high_threshold,
+            p_value_threshold=args.p_value_threshold,
+        )
+    if args.command == "drift-current":
+        from .tools.tool_drift_current import run_drift_current
+
+        return run_drift_current(
+            args.model_id, args.file, sid=args.sid,
+            psi_mild_threshold=args.psi_mild_threshold,
+            psi_significant_threshold=args.psi_significant_threshold,
+            psi_high_threshold=args.psi_high_threshold,
+            p_value_threshold=args.p_value_threshold,
+        )
     if args.command == "report":
         from .tools.tool_report import run_report
 

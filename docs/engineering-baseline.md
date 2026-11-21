@@ -255,7 +255,34 @@ Milestone 3 reproducibility and artifact integrity is implemented:
 - Focused tests passed after each submodule. Final M3 full-suite verification
   with `.venv/bin/python -m pytest -q` passed: **99 passed** in 6.65 seconds.
 
-Next linear task: begin Milestone 4 operational usability, starting with a
-scoped dependency-extras audit and confirming the documented CLI/workflow
-entrypoints before changing packaging.
+Milestone 4 operational usability is implemented:
+
+- Core dependencies are separated from MCP, boosters, SMOTE, visualization,
+  LLM-provider, and test extras. Optional-model errors identify the relevant
+  extra. CI installs the documented MCP/test environment and smoke-checks both
+  command entrypoints.
+- The `stratum` CLI covers profile, audit, split, train, validate, drift against
+  explicit files or a model's immutable training-time feature profile, HTML/JSON
+  reports, and artifact inspection. The HTML report is self-contained and
+  includes model comparison, recorded decisions/risks, evaluation evidence,
+  provenance, and recommended follow-up actions.
+- Training provenance retains numeric quantile-bin counts and hashed
+  categorical summaries for training features, without raw rows or raw
+  category strings. Monitoring supports configurable PSI/p-value thresholds,
+  severity and recommended actions, and persists findings. Legacy runs can use
+  an explicit reference file. Monitoring assesses feature distributions only;
+  label shift/performance needs labeled evaluation, and p-values are not
+  corrected for multiple comparisons.
+- The single README documents clean installs, both MLProj and Stratum entry
+  points, optional extras, CLI workflows, privacy/trust boundaries, and drift
+  limitations. `examples/churn.csv` is a small synthetic workflow fixture; its
+  metrics are not a generalization claim.
+- Focused drift/provenance/schema tests passed (45); focused CLI/packaging tests
+  passed (9). A CLI smoke workflow completed profile, stratified split, model
+  training, and HTML report generation. Final full-suite verification is
+  recorded below after completion.
+
+M0-M4 from the current roadmap are complete. The unresolved stdio MCP SDK
+handshake investigation recorded under M0 remains a known issue, not part of
+the operational-usability milestone.
 
