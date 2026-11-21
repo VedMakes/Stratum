@@ -1,6 +1,11 @@
 # Stratum
 
-Local-first tabular ML for AI agents.
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![MCP](https://img.shields.io/badge/Agent%20interface-MCP-6B4FBB)](https://modelcontextprotocol.io/)
+[![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](tests/)
+[![Local-first](https://img.shields.io/badge/data-local--first-2E8B57)](#privacy-and-storage)
+
+**Local-first tabular data analysis and machine learning for AI agents.**
 
 Stratum is the main product here: an MCP server that lets an agent inspect CSVs,
 audit modelling risks, split data, train models, validate them, score new rows,
@@ -10,6 +15,14 @@ service.
 It ships with **MLProj**, a small modular statistical modelling library. Stratum
 uses MLProj under the hood for model wrappers, tuning, scoring, feature
 importance, and fitted artifacts; you can also use MLProj directly from Python.
+
+**In a hurry?** Start with [Install](#install), then choose the
+[MCP agent workflow](#mcp-setup) or [Python library](#direct-mlproj-usage).
+New to the project? Read [What You Get](#what-you-get), then try the
+[CLI Quickstart](#cli-quickstart) with the included synthetic example.
+
+**Tags:** `Python` `MCP` `tabular ML` `statistical modeling` `scikit-learn`
+`pandas` `local-first` `agent skills`
 
 ## What You Get
 
@@ -35,6 +48,10 @@ python -m venv .venv
 python -m pip install -e ".[stratum,test]"
 python -m pytest
 ```
+
+Windows PowerShell activation uses `.venv\Scripts\Activate.ps1`. These
+commands install the MCP server and test dependencies into the active
+environment; optional boosters and LLM providers are installed separately.
 
 Smoke-check the MCP entrypoint:
 
@@ -117,6 +134,11 @@ After installation, configure your MCP client to launch `stratum-mcp`:
   }
 }
 ```
+
+Config keys and file locations vary by MCP client. If the client cannot find
+the command, use the absolute executable path shown below, reload the client,
+and confirm Stratum's tools are listed. Begin with `stratum_profile` on a local
+CSV, using the [Agent Workflow](#agent-workflow) as a guide.
 
 The stdio setup is covered by a subprocess smoke test that completes MCP
 initialization and lists the registered tools. CI runs this handshake against
@@ -247,6 +269,36 @@ Blocking decisions must declare `safe_answers`. A recommendation is not a user
 decision: only an answer explicitly listed as safe clears the workflow gate.
 Unknown, deferred, and unsafe answers remain visible and keep training,
 prediction, and export blocked until the decision is safely resolved.
+
+## Independent Domain Review
+
+Use an independent reviewer to assess whether Stratum's analysis and handoff
+fit the real decision context. This differs from checking that the tools run.
+The included `examples/churn.csv` is synthetic and tiny: it is suitable for
+testing setup and interaction only, not domain correctness, business value, or
+model generalization.
+
+For a real review, use data approved for that purpose and ask a domain-informed
+reviewer who did not operate the agent to inspect the report and supporting
+evidence. Agree on these facts before analysis: what one row represents, the
+target and outcome horizon, when a prediction would be made, and which fields
+are genuinely available at that time. Then assess whether:
+
+- The target, prediction timing, and split design match the intended use.
+- Leakage, missingness, class support, uncertainty, and relevant subgroups are
+  clear and not understated.
+- Baselines and metrics answer the stated decision question.
+- Recommendations cite saved evidence, state trade-offs, and remain
+  recommendations rather than being treated as user approval.
+- Another person can trace the question, assumptions, decisions, data, split,
+  model, and limitations from the report.
+
+Log disagreements with supporting evidence and severity; reproduce software
+defects before changing behavior. One review identifies issues, not universal
+correctness. A lightweight review record should capture the question,
+dataset/version, target and prediction time, reviewer role, findings, severity,
+evidence, and follow-up outcome. Keep sensitive data local and follow your
+organization's access and retention rules.
 
 ## MCP Tool Map
 
